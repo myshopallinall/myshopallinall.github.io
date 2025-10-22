@@ -39,6 +39,10 @@
     .cart-empty,.order-empty {color:#666; background:#fcfcfc; padding:1rem; border-radius:8px;}
     .place-order-btn { margin-top:1rem;background:#e91e63;color:#fff;font-weight:bold;padding:11px 34px;border:none;border-radius:6px;cursor:pointer;font-size:1.07rem;box-shadow:0 2px 8px #e91e6326;}
     .place-order-btn:hover { background:#c0392b;}
+    .prod-status-ind { padding:2px 8px; border-radius:5px; margin-right:3px; font-size:0.99em;}
+    .prod-status-pending{background:#ffe600;color:#222;}
+    .prod-status-confirmed{background:#3498db;color:#fff;}
+    .prod-status-delivered{background:#27ae60;color:#fff;}
     @media (max-width: 600px) {
       main {padding:0;}
       .section {padding:1rem;}
@@ -265,13 +269,12 @@
     }
     // Prefill customer details, change email if you fetch it from profile table
     let options = {
-      key: "rzp_live_RS6JXqKrLXCdOh", // Replace with your Razorpay Key ID
+      key: "rzp_test_RWfoVf4VK0sQaK", // or your live key for production
       amount: latestTotal * 100, // Amount must be in paise
       currency: "INR",
       name: "MyShop",
       description: "Order Payment",
       handler: function(response) {
-        // Razorpay payment_id available in response.razorpay_payment_id
         placeOrder(latestCart, latestTotal, response.razorpay_payment_id);
       },
       prefill: {
@@ -283,7 +286,6 @@
     rzp.open();
   };
 
-  // Save paid order in Supabase
   window.placeOrder = async function(cartItems, totalAmount, paymentId) {
     try {
       if (!cartItems.length) {
@@ -310,7 +312,8 @@
             product_id: item.product_id,
             seller_id: item.products.seller_id,
             quantity: item.quantity,
-            price: item.products.price
+            price: item.products.price,
+            status: 'pending'
           },
         ]);
       }
@@ -326,7 +329,7 @@
   async function loadOrders() {
     const { data: orders, error } = await supabase
       .from("orders")
-      .select("id, total, created_at, status, payment_id, order_items(product_id, quantity, price, products(name))")
+      .select("id, total, created_at, status, payment_id, order_items(product_id, quantity, price, status, products(name))")
       .eq("customer_id", customerId)
       .order("created_at", { ascending: false });
     const container = document.getElementById("orders-list");
@@ -342,13 +345,17 @@
         <span style="color:#e91e63;">Status: ${order.status}</span>
         <span style="color:#15a100; margin-left:16px;">Payment ID: ${order.payment_id || '-'}</span>
         <span style="color:#0070f3;float:right;">Total: ₹${order.total}</span><br>
-        <table><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr>`;
+        <table><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th><th>Delivery Status</th></tr>`;
       order.order_items.forEach((item) => {
+        let prodStatusClass = "prod-status-ind prod-status-pending";
+        if (item.status === "delivered") prodStatusClass = "prod-status-ind prod-status-delivered";
+        else if (item.status === "confirmed") prodStatusClass = "prod-status-ind prod-status-confirmed";
         html += `<tr>
           <td>${item.products.name}</td>
           <td>${item.quantity}</td>
           <td>₹${item.price}</td>
           <td>₹${item.price * item.quantity}</td>
+          <td><span class="${prodStatusClass}">${item.status || 'pending'}</span></td>
         </tr>`;
       });
       html += `</table></div>`;

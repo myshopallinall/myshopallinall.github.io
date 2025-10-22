@@ -27,6 +27,7 @@
     .btn-deliver { background: #3498db; }
     .btn-invoice { background: #e67e22; }
     .btn-delivery-info { background: #9b59b6; }
+    .btn-prod-delivered { background: #15a100; margin-left:2px; }
     .delivered-status { color: #27ae60; font-weight: bold; }
     .paid-status { color: #005bb5; font-weight: bold; }
     .modal {
@@ -38,6 +39,10 @@
     .modal-close { float:right; background:none; border:none; font-size:22px; cursor:pointer; }
     .modal-print { float:right; margin-right:10px; background:#3498db; color:#fff; border:none; border-radius:5px; font-size:15px; padding:5px 14px; cursor:pointer; }
     .modal-content { clear:both; margin-top:8px;}
+    .prod-status-ind { padding:2px 8px; border-radius:5px; margin-right:3px; font-size:0.98em;}
+    .prod-status-pending{background:#ffe600;color:#222;}
+    .prod-status-confirmed{background:#3498db;color:#fff;}
+    .prod-status-delivered{background:#27ae60;color:#fff;}
   </style>
 </head>
 <body>
@@ -87,6 +92,7 @@
 
   let currentUser = null;
 
+  // --- Load all seller orders ---
   async function loadSellerOrders() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -110,6 +116,7 @@
           quantity,
           price,
           hsn_code,
+          status,
           products(name, seller_id),
           profiles_seller: seller_id (id, name, address, email, gst_number, pan_number)
         )
@@ -121,7 +128,7 @@
       return;
     }
 
-    // Only show orders where at least one item belongs to the seller
+    // Only show orders with at least one item for the seller
     const sellerOrders = orders.filter(order =>
       order.order_items.some(item =>
         item.profiles_seller && item.profiles_seller.id === user.id
@@ -130,7 +137,7 @@
     const tbody = document.querySelector('#orders-table tbody');
     tbody.innerHTML = '';
     sellerOrders.forEach(order => {
-      // HSN codes only from this seller's items
+      // HSN code only from seller's items
       const itemCodes = order.order_items.filter(
         item => item.profiles_seller && item.profiles_seller.id === user.id
       ).map(item => item.hsn_code || '-').join(', ');
@@ -152,31 +159,14 @@
 
       const actionTd = tr.querySelector('td:last-child');
 
-      // Delivery Details button (always available)
+      // Delivery Details button
       const deliveryBtn = document.createElement('button');
       deliveryBtn.className = 'btn-delivery-info';
       deliveryBtn.textContent = 'Delivery Details';
       deliveryBtn.onclick = () => showDeliveryDetails(order, user.id);
       actionTd.appendChild(deliveryBtn);
 
-      // Confirm / Mark Delivered logic
-      if (order.status === 'pending') {
-        const confirmBtn = document.createElement('button');
-        confirmBtn.className = 'btn-confirm';
-        confirmBtn.textContent = 'Confirm';
-        confirmBtn.onclick = () => updateOrderStatus(order.id, 'confirmed');
-        actionTd.appendChild(confirmBtn);
-      }
-
-      if (order.status === 'confirmed') {
-        const deliverBtn = document.createElement('button');
-        deliverBtn.className = 'btn-deliver';
-        deliverBtn.textContent = 'Mark Delivered';
-        deliverBtn.onclick = () => updateOrderStatus(order.id, 'delivered');
-        actionTd.appendChild(deliverBtn);
-      }
-
-      // Invoice button (always available)
+      // Invoice button
       const invoiceBtn = document.createElement('button');
       invoiceBtn.className = 'btn-invoice';
       invoiceBtn.textContent = 'Invoice Details';
@@ -185,12 +175,11 @@
     });
   }
 
+  // --- Show delivery modal; allow marking items as delivered ---
   function showDeliveryDetails(order, sellerId) {
-    // Filter order_items for just this seller
     const filteredItems = order.order_items.filter(
       item => item.profiles_seller && item.profiles_seller.id === sellerId
     );
-
     let deliveryStatus = '';
     if (order.status === 'delivered') {
       deliveryStatus = '<span class="delivered-status">Delivered & Paid</span>';
@@ -218,17 +207,29 @@
             <th>Qty</th>
             <th>Unit Price</th>
             <th>Total</th>
+            <th>Product Status</th>
+            <th>Action</th>
           </tr>
         </thead>
         <tbody>
     `;
     filteredItems.forEach(item => {
+      let prodStatusClass = "prod-status-ind prod-status-pending";
+      if (item.status === "delivered") prodStatusClass = "prod-status-ind prod-status-delivered";
+      else if (item.status === "confirmed") prodStatusClass = "prod-status-ind prod-status-confirmed";
       html += `<tr>
         <td>${item.products.name}</td>
         <td>${item.hsn_code || '-'}</td>
         <td>${item.quantity}</td>
         <td>₹${item.price}</td>
         <td>₹${item.price * item.quantity}</td>
+        <td><span class="${prodStatusClass}">${item.status || 'pending'}</span></td>
+        <td>
+          ${item.status !== 'delivered' ?
+            `<button class="btn-prod-delivered" onclick="markProductDelivered(${item.id})">Mark Delivered</button>`
+            : `<span class="delivered-status">Delivered</span>`
+          }
+        </td>
       </tr>`;
     });
     // Total only for seller's items
@@ -239,6 +240,20 @@
     document.getElementById('delivery-modal').style.display = 'block';
   }
 
+  // --- Action to mark individual product delivered ---
+  window.markProductDelivered = async function(orderItemId) {
+    const { error } = await supabase.from('order_items').update({ status: 'delivered' }).eq('id', orderItemId);
+    if (error) {
+      showStatusMessage('Failed to update product: ' + error.message, '#ffeded', '#a10021');
+    } else {
+      showStatusMessage('Product marked as delivered.');
+      // Refresh seller orders/modal
+      loadSellerOrders();
+      document.getElementById('delivery-modal').style.display = 'none';
+    }
+  };
+
+  // --- Order status update (for entire order, optional/legacy) ---
   async function updateOrderStatus(orderId, newStatus) {
     let actionMsg = '';
     if (newStatus === 'confirmed') {
@@ -263,6 +278,7 @@
     }
   }
 
+  // --- Invoice Modal (seller-filtered items only) ---
   async function showInvoice(orderId, sellerId) {
     const { data: order, error } = await supabase.from('orders')
       .select(`
@@ -275,6 +291,7 @@
           quantity,
           price,
           hsn_code,
+          status,
           products(name, seller_id),
           profiles_seller: seller_id(id, name, address, email, gst_number, pan_number)
         )
@@ -287,7 +304,7 @@
       return;
     }
 
-    // Filter only the items for this seller
+    // Only this seller's items
     const filteredItems = order.order_items.filter(
       item => item.profiles_seller && item.profiles_seller.id === sellerId
     );
@@ -318,20 +335,23 @@
       <hr>
       <table border="1" cellpadding="4" cellspacing="0" width="100%">
         <thead>
-          <tr><th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+          <tr><th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Product Status</th></tr>
         </thead>
         <tbody>
     `;
     filteredItems.forEach(item => {
+      let prodStatusClass = "prod-status-ind prod-status-pending";
+      if (item.status === "delivered") prodStatusClass = "prod-status-ind prod-status-delivered";
+      else if (item.status === "confirmed") prodStatusClass = "prod-status-ind prod-status-confirmed";
       html += `<tr>
         <td>${item.products.name}</td>
         <td>${item.hsn_code || '-'}</td>
         <td>${item.quantity}</td>
         <td>₹${item.price}</td>
         <td>₹${item.price * item.quantity}</td>
+        <td><span class="${prodStatusClass}">${item.status || 'pending'}</span></td>
       </tr>`;
     });
-    // Total only for seller's items
     const total = filteredItems.reduce((sum, i) => sum + (i.quantity * i.price), 0);
     html += `</tbody></table><hr><h3>Total: ₹${total}</h3>`;
 

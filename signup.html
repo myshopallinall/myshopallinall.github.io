@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="UTF-8" />
   <title>Sign Up - MyShop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f2f5fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
     #signup-form { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 360px; width: 100%; }
@@ -27,6 +27,8 @@
     <option value="customer">Customer</option>
     <option value="seller">Seller</option>
   </select>
+  <input type="text" id="gst_number" placeholder="GST Number (required for sellers)" style="display:none;" />
+  <input type="text" id="pan_number" placeholder="PAN Number (required for sellers)" style="display:none;" />
   <button type="submit">Sign Up</button>
   <div class="link" onclick="window.location.href='login.html'">Already have an account? Login</div>
 </form>
@@ -39,6 +41,30 @@
     );
     const form = document.getElementById('signup-form');
     const messageDiv = document.getElementById('message');
+    const roleSelect = document.getElementById('role');
+    const gstInput = document.getElementById('gst_number');
+    const panInput = document.getElementById('pan_number');
+
+    function toggleTaxFields() {
+      if (roleSelect.value === 'seller') {
+        gstInput.style.display = 'block';
+        panInput.style.display = 'block';
+        gstInput.required = true;
+        panInput.required = true;
+      } else {
+        gstInput.style.display = 'none';
+        panInput.style.display = 'none';
+        gstInput.required = false;
+        panInput.required = false;
+        gstInput.value = '';
+        panInput.value = '';
+      }
+    }
+
+    roleSelect.addEventListener('change', toggleTaxFields);
+
+    toggleTaxFields();  // initialize on load
+
     form.onsubmit = async function(e) {
       e.preventDefault();
       messageDiv.textContent = '';
@@ -46,15 +72,45 @@
       const name = document.getElementById('name').value.trim();
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value.trim();
+      const role = roleSelect.value;
+      const gst_number = gstInput.value.trim();
+      const pan_number = panInput.value.trim();
+
       if (password.length < 6) {
         messageDiv.textContent = "Password must be at least 6 characters.";
         messageDiv.className = 'error';
         return;
       }
+
+      if (role === 'seller') {
+        if (!gst_number) {
+          messageDiv.textContent = "GST Number is required for sellers.";
+          messageDiv.className = 'error';
+          return;
+        }
+        if (!pan_number) {
+          messageDiv.textContent = "PAN Number is required for sellers.";
+          messageDiv.className = 'error';
+          return;
+        }
+      }
+
       try {
         messageDiv.textContent = "Creating account, please wait...";
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
+
+        // Insert profile row
+        await supabase.from('profiles').insert([{
+          id: data.user.id,
+          name,
+          email,
+          role,
+          gst_number: role === 'seller' ? gst_number : null,
+          pan_number: role === 'seller' ? pan_number : null,
+          created_at: new Date()
+        }]);
+
         messageDiv.textContent = "Signup successful! Please check your email (including spam) for a verification link before logging in.";
         messageDiv.className = 'success';
         setTimeout(() => { window.location.href = 'login.html'; }, 4500);

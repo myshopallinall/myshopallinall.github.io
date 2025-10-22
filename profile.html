@@ -6,11 +6,13 @@
   <title>Update Profile - MyShop</title>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f2f5fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
-    #profile-form { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 440px; width: 100%; }
+    #profile-form { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 480px; width: 100%; }
     #profile-form h2 { margin-bottom: 1rem; color: #0070f3; text-align: center; }
     input, button { width: 100%; padding: 0.8rem; margin: 0.5rem 0 1rem 0; border-radius: 6px; border: 1.5px solid #ddd; font-size: 1rem; }
     button { background-color: #0070f3; color: white; font-weight: bold; border: none; cursor: pointer; transition: background-color 0.25s ease; }
     button:hover { background-color: #005bb5; }
+    #delete-account-btn { background-color: #e74c3c; margin-top: 0.3rem; }
+    #delete-account-btn:hover { background-color: #c0392b; }
     .message { font-weight: bold; margin-bottom: 1rem; text-align: center; }
     .success { color: #27ae60; }
     .error { color: #e74c3c; }
@@ -24,8 +26,12 @@
   <input type="email" id="email" placeholder="Email" disabled />
   <input type="text" id="address" placeholder="Address" />
   <input type="tel" id="phone" placeholder="Phone" />
+  <input type="text" id="gst_number" placeholder="GST Number (for sellers)" required />
+  <input type="text" id="pan_number" placeholder="PAN Number (for sellers)" required />
   <button type="submit">Save</button>
+  <button type="button" id="delete-account-btn">Delete Account</button>
 </form>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const supabase = window.supabase.createClient(
@@ -35,17 +41,22 @@
 
   const form = document.getElementById('profile-form');
   const messageDiv = document.getElementById('message');
+  const gstInput = document.getElementById('gst_number');
+  const panInput = document.getElementById('pan_number');
+  const deleteBtn = document.getElementById('delete-account-btn');
+  let userRole = '';
 
   async function loadProfile() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }} = await supabase.auth.getUser();
     if (!user) {
       alert('Please login first!');
       window.location.href = 'login.html';
       return;
     }
+
     const { data, error } = await supabase
       .from('profiles')
-      .select('name, email, address, phone')
+      .select('name, email, address, phone, gst_number, pan_number, role')
       .eq('id', user.id)
       .single();
 
@@ -59,25 +70,59 @@
     document.getElementById('email').value = data.email || '';
     document.getElementById('address').value = data.address || '';
     document.getElementById('phone').value = data.phone || '';
+    gstInput.value = data.gst_number || '';
+    panInput.value = data.pan_number || '';
+
+    userRole = data.role;
+    if (userRole !== 'seller') {
+      gstInput.required = false;
+      panInput.required = false;
+      gstInput.style.display = 'none';
+      panInput.style.display = 'none';
+    } else {
+      gstInput.required = true;
+      panInput.required = true;
+      gstInput.style.display = '';
+      panInput.style.display = '';
+    }
   }
 
   form.onsubmit = async function(e) {
     e.preventDefault();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }} = await supabase.auth.getUser();
     if (!user) {
       alert('Please login first!');
       window.location.href = 'login.html';
       return;
     }
+
     const name = document.getElementById('name').value.trim();
     const address = document.getElementById('address').value.trim();
     const phone = document.getElementById('phone').value.trim();
+    const gst_number = gstInput.value.trim();
+    const pan_number = panInput.value.trim();
+
+    // Basic validation for GST/PAN if visible and required
+    if (userRole === 'seller') {
+      if (!gst_number) {
+        messageDiv.textContent = 'GST Number is required for sellers';
+        messageDiv.className = 'message error';
+        return;
+      }
+      if (!pan_number) {
+        messageDiv.textContent = 'PAN Number is required for sellers';
+        messageDiv.className = 'message error';
+        return;
+      }
+    }
 
     const { error } = await supabase.from('profiles').upsert({
       id: user.id,
       name,
       address,
-      phone
+      phone,
+      gst_number: gst_number || null,
+      pan_number: pan_number || null
     });
 
     if (error) {
@@ -87,6 +132,11 @@
       messageDiv.textContent = 'Profile updated successfully!';
       messageDiv.className = 'message success';
     }
+  };
+
+  // Add event for account deletion
+  deleteBtn.onclick = function() {
+    window.location.href = 'account_delete.html';
   };
 
   window.onload = loadProfile;

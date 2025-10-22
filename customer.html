@@ -4,48 +4,112 @@
   <meta charset="UTF-8" />
   <title>Customer Portal - MyShop</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f8fbfd; margin:0; padding:1.6rem;}
-    h1, h2 { color: #0070f3; margin-bottom:1.1rem;}
-    nav { display:flex;justify-content:space-between;align-items:center;margin-bottom:2rem;}
-    nav button { padding:8px 16px;background:#e74c3c;color:#fff;border:none;border-radius:5px;cursor:pointer;}
-    nav button:hover { background:#c0392b;}
-    #products-list { display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.2rem;}
-    .product-card { background:white;border-radius:8px;padding:1rem;box-shadow:0 2px 8px #0070f330;text-align:center;}
-    .product-card img { width:120px;height:120px;object-fit:cover;background:#fafafa;margin-bottom:0.7rem;}
-    .product-name { font-weight:700;margin-bottom:0.3rem;color:#0070f3;}
-    .product-price { color:#e91e63;font-weight:bold;}
-    .product-desc { margin:0.4rem 0 0.1rem 0;color:#555;font-size:0.97rem;word-break:break-word;}
-    .add-cart-btn { margin-top:0.9rem;padding:7px 18px;background:#0070f3;color:#fff;border-radius:5px;border:none;font-weight:600;cursor:pointer;}
-    .add-cart-btn:hover { background:#005bb5;}
-    #cart-list,#orders-list { margin-top:2rem;}
-    table { width:100%;border-collapse:collapse;margin-top:0.5rem;background:#fff;}
-    table th,table td { border:1px solid #eee;padding:8px;text-align:left;font-size:0.98rem;}
-    table th { background:#f1f6fa;}
-    .place-order-btn { margin-top:1rem;background:#e91e63;color:#fff;font-weight:bold;padding:10px 22px;border:none;border-radius:6px;cursor:pointer;}
+    body { font-family: 'Montserrat', Arial, sans-serif; background: #f6f7fa; margin:0; }
+    .header {
+      background: linear-gradient(90deg,#232f3e 70%,#0070f3 100%);
+      color: #fff; padding: 1rem 2.4rem; display: flex; align-items: center; justify-content: space-between;
+      box-shadow:0 3px 8px #0070f335; position:sticky; top:0; z-index:99;
+    }
+    .header h1 { font-size:2.1rem; letter-spacing:1px; margin:0;}
+    .header .nav-group button {
+      margin-left:12px; font-size:1rem; padding:8px 17px; border:none; border-radius:3px; cursor:pointer;
+      background:#ffe600; color:#232f3e; font-weight:bold; box-shadow:0 2px 6px #0001;
+      transition:background 0.2s;
+    }
+    .header .nav-group button:hover { background:#f2c700; }
+    main {max-width:1200px; margin:2rem auto 1rem;}
+    .products-section {margin-top:1.5rem;}
+    .products-header {display:flex;justify-content:space-between;align-items:center;}
+    .products-header h2 {font-size:1.45rem;margin-bottom:0.7rem;}
+    .search-sort-wrap { display:flex; gap:12px; align-items:center;}
+    .search-bar {padding:7px 15px;font-size:1rem;border-radius:5px; border:1px solid #ccc;}
+    .sort-select {padding:7px 8px;border-radius:5px; border:1px solid #ccc;font-size:1rem;}
+    #products-list { display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.6rem;}
+    .product-card {
+      background:#fff; border-radius:12px; padding:1.3rem 1rem; box-shadow:0 2px 14px #232f3e10;
+      display:flex;flex-direction:column;align-items:center;transition:box-shadow 0.18s,transform 0.18s;
+      position:relative; min-height:330px;
+    }
+    .product-card:hover { box-shadow: 0 6px 18px #232f3e24; transform:translateY(-5px);}
+    .badge {position:absolute;top:12px;right:12px;background:#e91e63;color:#fff;font-size:0.92rem;padding:5px 11px;border-radius:20px;font-weight:600;box-shadow:0 1px 5px #e91e6322;}
+    .product-card img { width:128px;height:128px;border-radius:7px;object-fit:cover;background:#f6f7fa;margin-bottom:0.9rem; }
+    .product-name { font-weight:700; margin-bottom:0.35rem; color:#232f3e; font-size:1.09rem;}
+    .product-price { color:#e91e63; font-weight:bold; font-size:1.12rem;}
+    .product-desc { margin:0.5rem 0 0.1rem 0;color:#555;font-size:0.97rem;word-break:break-word;}
+    .add-cart-btn {
+      margin-top:1.05rem; padding:8px 30px; background:#232f3e; color:#ffe600; border-radius:5px; border:none;
+      font-weight:700; letter-spacing:0.5px; font-size:1.05rem; cursor:pointer; box-shadow:0 2px 7px #232f3e14; transition:background 0.18s;
+    }
+    .add-cart-btn:hover { background:#0070f3; color:#fff;}
+    .section {background:#fff;padding:2rem 1.5rem;border-radius:9px;box-shadow:0 2px 11px #232f3e12;margin-bottom:1rem;}
+    table { width:100%; border-collapse:collapse; margin:1.2rem auto 0;background:#fff;}
+    th,td { padding:10px 8px; border:1px solid #eee; font-size:1rem;}
+    th { background:#f8fbfd; color:#0070f3; font-weight:700;}
+    .cart-empty,.order-empty {color:#666; background:#fcfcfc; padding:1rem; border-radius:8px;}
+    .place-order-btn { margin-top:1rem;background:#e91e63;color:#fff;font-weight:bold;padding:11px 34px;border:none;border-radius:6px;cursor:pointer;font-size:1.07rem;box-shadow:0 2px 8px #e91e6326;}
     .place-order-btn:hover { background:#c0392b;}
+    @media (max-width: 600px) {
+      main {padding:0;}
+      .section {padding:1rem;}
+      #products-list {grid-template-columns:1fr;}
+      .header {padding:1rem 1rem;}
+      .search-sort-wrap{flex-direction:column;gap:10px;}
+    }
   </style>
 </head>
 <body>
-<nav>
-  <h1>Customer Portal</h1>
-  <button id="logout-btn">Logout</button>
-</nav>
-<h2>Products</h2>
-<div id="products-list"></div>
-<h2>Your Cart</h2>
-<div id="cart-list"></div>
-<button class="place-order-btn" onclick="placeOrder()">Place Order</button>
-<h2>Your Orders</h2>
-<div id="orders-list"></div>
+<div class="header">
+  <h1>MyShop</h1>
+  <div class="nav-group">
+    <button id="profile-btn">Your Profile</button>
+    <button id="logout-btn">Logout</button>
+  </div>
+</div>
+<main>
+  <div class="products-section">
+    <div class="products-header">
+      <h2>Latest Products</h2>
+      <div class="search-sort-wrap">
+        <input class="search-bar" id="searchInput" type="text" placeholder="Search products..." oninput="renderProducts()" />
+        <select class="sort-select" id="categorySelect" onchange="renderProducts()">
+          <option value="">All Categories</option>
+        </select>
+        <select class="sort-select" id="sortSelect" onchange="renderProducts()">
+          <option value="latest">Sort: Latest</option>
+          <option value="name_asc">Name (A-Z)</option>
+          <option value="name_desc">Name (Z-A)</option>
+          <option value="price_asc">Price Low-High</option>
+          <option value="price_desc">Price High-Low</option>
+          <option value="category_asc">Category (A-Z)</option>
+          <option value="category_desc">Category (Z-A)</option>
+        </select>
+      </div>
+    </div>
+    <div id="products-list"></div>
+  </div>
+  <div class="section">
+    <h2>Your Cart</h2>
+    <div id="cart-list"></div>
+    <button class="place-order-btn" onclick="startPayment()">Proceed to Pay</button>
+  </div>
+  <div class="section">
+    <h2>Your Orders</h2>
+    <div id="orders-list"></div>
+  </div>
+</main>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const supabase = window.supabase.createClient(
     'https://wamqheltqmufuzrqlxlb.supabase.co',
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
   );
   let customerId = null;
+  let latestCart = [], latestTotal = 0;
+  let allProducts = [];
 
   async function checkLogin() {
     const { data } = await supabase.auth.getUser();
@@ -53,35 +117,72 @@
       alert('Please login first!'); window.location.href = 'login.html'; return;
     }
     customerId = data.user.id;
-    loadProducts();
+    await loadProducts();
     loadCart();
     loadOrders();
   }
 
   async function loadProducts() {
     const { data, error } = await supabase.from('products').select('*');
+    allProducts = (error || !data) ? [] : data;
+    populateCategories();
+    renderProducts();
+  }
+
+  function populateCategories() {
+    const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+    const categorySelect = document.getElementById('categorySelect');
+    categorySelect.innerHTML = '<option value="">All Categories</option>';
+    categories.forEach(cat => {
+      const option = document.createElement('option');
+      option.value = cat;
+      option.textContent = cat;
+      categorySelect.appendChild(option);
+    });
+  }
+
+  window.renderProducts = function() {
+    const searchText = document.getElementById('searchInput').value.toLowerCase();
+    const categoryFilter = document.getElementById('categorySelect').value;
+    const sortBy = document.getElementById('sortSelect').value;
+
+    let filtered = allProducts.filter(p =>
+      (p.name.toLowerCase().includes(searchText) ||
+      (p.description && p.description.toLowerCase().includes(searchText))) &&
+      (categoryFilter === '' || p.category === categoryFilter)
+    );
+
+    if (sortBy === 'name_asc') filtered.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sortBy === 'name_desc') filtered.sort((a, b) => b.name.localeCompare(a.name));
+    else if (sortBy === 'price_asc') filtered.sort((a, b) => a.price - b.price);
+    else if (sortBy === 'price_desc') filtered.sort((a, b) => b.price - a.price);
+    else if (sortBy === 'category_asc') filtered.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
+    else if (sortBy === 'category_desc') filtered.sort((a, b) => (b.category || '').localeCompare(a.category || ''));
+
     const container = document.getElementById('products-list');
     container.innerHTML = '';
-    if (error || !data.length) {
-      container.innerHTML = '<div>No products available.</div>'; return;
+    if (!filtered.length) {
+      container.innerHTML = '<div class="cart-empty">No products found.</div>';
+      return;
     }
-    data.forEach(prod => {
+    filtered.forEach(prod => {
       const div = document.createElement('div');
       div.className = 'product-card';
       div.innerHTML = `
-        <img src="${prod.image_url||''}" alt="${prod.name}" />
+        <div class="badge">${prod.price < 500 ? "Best Seller" : "Featured"}</div>
+        <img src="${prod.image_url || 'https://via.placeholder.com/128'}" alt="${prod.name}" />
         <div class="product-name">${prod.name}</div>
         <div class="product-price">₹${prod.price}</div>
-        <div class="product-desc">${prod.description||''}</div>
+        <div class="product-desc">${prod.description || ''}</div>
+        <div><em>Category: ${prod.category || 'N/A'}</em></div>
         <button class="add-cart-btn" onclick="addToCart('${prod.id}', ${prod.price})">Add to Cart</button>
       `;
       container.appendChild(div);
     });
-  }
+  };
 
   window.addToCart = async function(productId, productPrice) {
     try {
-      // Check if already exists
       const { data: item, error: selectError } = await supabase
         .from('cart')
         .select('*')
@@ -105,15 +206,20 @@
     } catch (error) {
       alert('Cart Error: ' + error.message);
     }
-  }
+  };
 
   async function loadCart() {
     const { data, error } = await supabase
       .from('cart')
-      .select('id, product_id, quantity, products(name, price)')
+      .select('id, product_id, quantity, products(name, price, seller_id)')
       .eq('customer_id', customerId);
     const container = document.getElementById('cart-list');
-    if (error || !data.length) { container.innerHTML = '<div>Cart empty.</div>'; return; }
+    if (error || !data.length) {
+      container.innerHTML = '<div class="cart-empty">Your cart is empty.</div>';
+      latestCart = [];
+      latestTotal = 0;
+      return;
+    }
     let html = `<table>
       <tr><th>Product</th><th>Price</th><th>Qty</th><th>Total</th><th>Remove</th></tr>`;
     data.forEach(item => {
@@ -122,64 +228,101 @@
         <td>₹${item.products.price}</td>
         <td>${item.quantity}</td>
         <td>₹${item.quantity * item.products.price}</td>
-        <td><button onclick="removeFromCart('${item.id}')">Delete</button></td>
+        <td><button onclick="removeFromCart('${item.id}')" style="background:#e74c3c;color:#fff;padding:4px 12px;border:none;border-radius:4px;cursor:pointer;">Delete</button></td>
       </tr>`;
     });
     html += '</table>';
     container.innerHTML = html;
+    latestCart = data;
+    latestTotal = data.reduce((sum, item) => sum + (item.products.price * item.quantity), 0);
   }
 
   window.removeFromCart = async function(cartId) {
     await supabase.from('cart').delete().eq('id', cartId);
     loadCart();
-  }
+  };
 
-  window.placeOrder = async function() {
-    // Get current cart
-    const { data: cartItems } = await supabase
-      .from('cart')
-      .select('product_id, quantity, products(price, seller_id)')
-      .eq('customer_id', customerId);
-    if (!cartItems.length) { alert('Cart is empty!'); return; }
-    // Calculate total
-    let totalAmount = cartItems.reduce((sum, item) => sum + (item.quantity * item.products.price), 0);
-    // Create order
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert([{ customer_id: customerId, total: totalAmount }])
-      .select()
-      .single();
-    if (orderError || !order) { alert('Order failed!'); return; }
-    // Add order_items
-    for (let item of cartItems) {
-      await supabase.from('order_items').insert([{
-        order_id: order.id,
-        product_id: item.product_id,
-        seller_id: item.products.seller_id,
-        quantity: item.quantity,
-        price: item.products.price
-      }]);
+  // Razorpay payment and order logic
+  window.startPayment = function() {
+    if (!latestCart.length || latestTotal === 0) {
+      alert('Cart is empty!');
+      return;
     }
-    // Clear cart
-    await supabase.from('cart').delete().eq('customer_id', customerId);
-    alert('Order placed successfully!');
-    loadCart(); loadOrders();
-  }
+    let options = {
+      key: "rzp_live_RS6JXqKrLXCdOh", // Your Razorpay Key ID
+      amount: latestTotal * 100,
+      currency: "INR",
+      name: "MyShop",
+      description: "Order Payment",
+      handler: function(response) {
+        placeOrder(latestCart, latestTotal, response.razorpay_payment_id);
+      },
+      prefill: {
+        email: "customer@domain.com",
+      },
+      theme: { color: "#0070f3" },
+    };
+    let rzp = new Razorpay(options);
+    rzp.open();
+  };
+
+  window.placeOrder = async function(cartItems, totalAmount, paymentId) {
+    try {
+      if (!cartItems.length) {
+        alert("Cart is empty!");
+        return;
+      }
+      const { data: order, error: orderError } = await supabase
+        .from("orders")
+        .insert([
+          { customer_id: customerId, total: totalAmount, payment_id: paymentId, status: "paid" },
+        ])
+        .select()
+        .single();
+      if (orderError || !order) {
+        alert("Order failed! " + (orderError?.message || ""));
+        return;
+      }
+      for (let item of cartItems) {
+        await supabase.from("order_items").insert([
+          {
+            order_id: order.id,
+            product_id: item.product_id,
+            seller_id: item.products.seller_id,
+            quantity: item.quantity,
+            price: item.products.price,
+          },
+        ]);
+      }
+      await supabase.from("cart").delete().eq("customer_id", customerId);
+      alert("Order placed successfully!");
+      loadCart();
+      loadOrders();
+    } catch (err) {
+      alert("Order saving error: " + err.message);
+    }
+  };
 
   async function loadOrders() {
     const { data: orders, error } = await supabase
-      .from('orders')
-      .select('id, total, created_at, status, order_items(product_id, quantity, price, products(name))')
-      .eq('customer_id', customerId).order('created_at', { ascending: false });
-    const container = document.getElementById('orders-list');
-    if (error || !orders.length) { container.innerHTML = '<div>No orders yet.</div>'; return; }
-    let html = '';
-    orders.forEach(order => {
+      .from("orders")
+      .select("id, total, created_at, status, order_items(product_id, quantity, price, products(name))")
+      .eq("customer_id", customerId)
+      .order("created_at", { ascending: false });
+    const container = document.getElementById("orders-list");
+    if (error || !orders.length) {
+      container.innerHTML = '<div class="order-empty">No orders yet.</div>';
+      return;
+    }
+    let html = "";
+    orders.forEach((order) => {
       html += `<div style="margin-bottom:1.3rem;">
-        <strong>Order #${order.id}</strong> <span style="color:#888;">(${order.created_at.slice(0,19).replace('T',' ')})</span>
+        <strong>Order #${order.id}</strong> <span style="color:#888;">(${order.created_at
+          .slice(0, 19)
+          .replace("T", " ")})</span>
         <span style="color:#e91e63;">Status: ${order.status}</span> <span style="color:#0070f3;float:right;">Total: ₹${order.total}</span><br>
         <table><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr>`;
-      order.order_items.forEach(item => {
+      order.order_items.forEach((item) => {
         html += `<tr>
           <td>${item.products.name}</td>
           <td>${item.quantity}</td>
@@ -192,11 +335,13 @@
     container.innerHTML = html;
   }
 
-  document.getElementById('logout-btn').onclick = async () => {
-    await supabase.auth.signOut();
-    window.location.href = 'login.html';
+  document.getElementById("profile-btn").onclick = function () {
+    window.location.href = "profile.html";
   };
-
+  document.getElementById("logout-btn").onclick = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "login.html";
+  };
   checkLogin();
 </script>
 </body>

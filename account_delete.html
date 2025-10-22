@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Delete Account - MyShop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f2f5fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    #delete-account-form { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 400px; width: 100%; text-align: center; }
+    button { background-color: #e74c3c; color: white; padding: 1rem 1.6rem; font-size: 1.15rem; border: none; border-radius: 6px; cursor: pointer; }
+    button:hover { background-color: #c0392b; }
+    .warning { color: #e74c3c; font-weight: bold; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+<div id="delete-account-form">
+  <h2>Delete Your Account</h2>
+  <p class="warning">Warning: This will delete your profile data and sign you out.<br>Please contact support to fully delete your authentication user.</p>
+  <button id="delete-btn">Delete My Account</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  document.getElementById('delete-btn').onclick = async () => {
+    if (!confirm("Are you sure you want to delete your profile data? This cannot be undone here.")) return;
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      alert('No logged-in user found.');
+      return;
+    }
+    const userId = user.id;
+
+    // Delete profile data
+    const { error: profileError } = await supabase.from('profiles').delete().eq('id', userId);
+    if (profileError) {
+      alert('Failed to delete profile data: ' + profileError.message);
+      return;
+    }
+
+    // Additional deletes (cart, orders, products for seller) can be added here if needed
+
+    alert('Your profile data was deleted. Logging out...');
+
+    await supabase.auth.signOut();
+    window.location.href = 'login.html';
+  };
+</script>
+</body>
+</html>

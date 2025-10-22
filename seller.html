@@ -7,7 +7,7 @@
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f9f9f9; margin: 0; padding: 2rem; }
     h1, h2 { color: #0070f3; }
-    form { background: white; border-radius: 6px; padding: 1rem; margin-bottom: 2rem; max-width: 450px; box-shadow: 0 3px 8px rgba(0,0,0,0.07); }
+    form { background: white; border-radius: 6px; padding: 1rem; margin-bottom: 2rem; max-width: 480px; box-shadow: 0 3px 8px rgba(0,0,0,0.07); }
     form input, form textarea { width: 100%; margin: 0.6rem 0; padding: 0.5rem; font-size: 1rem; border: 1.5px solid #ddd; border-radius: 4px; }
     form button { background: #0070f3; border: none; padding: 0.7rem 1.2rem; color: white; font-size: 1rem; border-radius: 4px; cursor: pointer; margin-top: 1rem; }
     form button:hover { background: #005bb5; }
@@ -18,18 +18,27 @@
     .product-price { color: #e91e63; font-weight: bold; margin-bottom: 0.3rem; }
     .product-desc { font-size: 0.95rem; color: #666; }
     nav { display: flex; justify-content: space-between; margin-bottom: 20px; }
-    nav button { padding: 8px 16px; background: #e74c3c; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
-    nav button:hover { background: #c0392b; }
+    nav .nav-group { display: flex; gap: 10px;}
+    nav button { padding: 8px 14px; background: #e74c3c; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+    nav button#orders-btn { background:#0070f3;}
+    nav button#profile-btn { background:#27ae60; }
+    nav button:hover { opacity:0.88;}
   </style>
 </head>
 <body>
 <nav>
   <h1>Seller Dashboard</h1>
-  <button id="logout-btn">Logout</button>
+  <div class="nav-group">
+    <button id="profile-btn">Profile</button>
+    <button id="orders-btn">Seller Orders</button>
+    <button id="logout-btn">Logout</button>
+  </div>
 </nav>
 
 <form id="add-product-form">
   <input type="text" id="prod-name" placeholder="Product Name" required />
+  <input type="text" id="category" placeholder="Category" required />
+  <input type="text" id="hsn-code" placeholder="HSN Code" required />
   <input type="number" id="prod-price" placeholder="Price (₹)" required />
   <textarea id="prod-desc" placeholder="Description"></textarea>
   <input type="file" id="prod-image-file" accept="image/*" />
@@ -52,10 +61,25 @@
     const { data } = await supabase.auth.getUser();
     if (data && data.user) {
       sellerId = data.user.id;
+      await checkSellerDetails();
       loadSellerProducts();
     } else {
       alert('Please log in first!');
       window.location.href = 'login.html';
+    }
+  }
+
+  // Require GST and PAN numbers before allowing add product
+  async function checkSellerDetails() {
+    const { data, error } = await supabase.from('profiles').select('gst_number, pan_number').eq('id', sellerId).single();
+    if (error || !data) {
+      alert('Could not get seller details. Please login again.');
+      window.location.href = 'login.html';
+      return;
+    }
+    if (!data.gst_number || !data.pan_number) {
+      alert('Please update your GST and PAN numbers in your profile before adding products.');
+      window.location.href = 'profile.html'; // Redirect to profile
     }
   }
 
@@ -79,6 +103,8 @@
   document.getElementById('add-product-form').onsubmit = async (e) => {
     e.preventDefault();
     const name = document.getElementById('prod-name').value;
+    const category = document.getElementById('category').value;
+    const hsn_code = document.getElementById('hsn-code').value;
     const price = parseInt(document.getElementById('prod-price').value, 10);
     const description = document.getElementById('prod-desc').value;
     const fileInput = document.getElementById('prod-image-file');
@@ -91,6 +117,8 @@
     const { error } = await supabase.from('products').insert([{
       seller_id: sellerId,
       name,
+      category,
+      hsn_code,
       price,
       description,
       image_url
@@ -119,6 +147,8 @@
       div.innerHTML = `
         <img src="${prod.image_url || ''}" alt="${prod.name}" />
         <div class="product-name">${prod.name}</div>
+        <div><b>Category:</b> ${prod.category || '-'}</div>
+        <div><b>HSN Code:</b> ${prod.hsn_code || '-'}</div>
         <div class="product-price">₹${prod.price}</div>
         <div class="product-desc">${prod.description || ''}</div>
       `;
@@ -126,6 +156,8 @@
     });
   }
 
+  document.getElementById('profile-btn').onclick = () => window.location.href = 'profile.html';
+  document.getElementById('orders-btn').onclick = () => window.location.href = 'seller_order.html';
   document.getElementById('logout-btn').onclick = async () => {
     await supabase.auth.signOut();
     window.location.href = 'login.html';

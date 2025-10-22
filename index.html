@@ -1,29 +1,89 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>MyShop - Amazon Style</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MyShop - Multi Seller E-Commerce</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f7fafd;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    header {
+      background: #0070f3;
+      color: #fff;
+      padding: 1.5rem 0;
+      text-align: center;
+      letter-spacing: 1.2px;
+    }
+    main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 50px;
+    }
+    h1 {
+      color: #0070f3;
+      font-size: 2.3rem;
+    }
+    .subtitle {
+      color: #333;
+      font-size: 1.2rem;
+      margin-bottom: 32px;
+    }
+    .nav-buttons {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 40px;
+    }
+    a.button {
+      padding: 0.9rem 2.2rem;
+      font-size: 1.05rem;
+      background: #0070f3;
+      color: #fff;
+      text-decoration: none;
+      border-radius: 6px;
+      box-shadow: 0 2px 8px #0070f332;
+      transition: background 0.2s;
+      font-weight: 600;
+    }
+    a.button:hover {
+      background: #005bb5;
+    }
+    footer {
+      text-align: center;
+      padding: 2rem 0 0.8rem 0;
+      font-size: 0.95rem;
+      color: #888;
+      position: fixed;
+      width: 100%;
+      bottom: 0;
+      background: #f7fafd;
+    }
+  </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="logo">MyShop</div>
-        <input type="text" class="search-bar" placeholder="Search products...">
-        <div class="cart">
-            🛒 Cart: <span id="cart-count">0</span>
-        </div>
-    </nav>
-    <header class="banner">
-        <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1400&q=80" alt="Banner">
-        <div class="banner-text">Big Discounts! Shop Now Like Amazon</div>
-    </header>
-    <main>
-        <h2 class="section-title">Top Deals</h2>
-        <section id="products" class="product-grid"></section>
-    </main>
-    <footer>
-        <div>© 2025 MyShop • Inspired by Amazon</div>
-    </footer>
-    <script src="script.js"></script>
+<header>
+  <div style="font-size:2.4rem;font-weight:bold;">MyShop</div>
+  <div style="font-size:1.08rem;margin-top:0.24rem;opacity:0.85;">Multi Seller E-Commerce Platform</div>
+</header>
+<main>
+  <h1>Welcome to MyShop!</h1>
+  <div class="subtitle">
+    An easy and secure place for both sellers and customers.<br>
+    <span style="color:#e91e63;font-size:1rem">Start Selling or Shopping Now!</span>
+  </div>
+  <div class="nav-buttons">
+    <a class="button" href="login.html">Login</a>
+    <a class="button" href="signup.html">Sign Up</a>
+    <!-- <a class="button" href="products.html">Browse Products</a> -->
+  </div>
+</main>
+<footer>
+  &copy; 2025 MyShop. All rights reserved.
+</footer>
 </body>
 </html>

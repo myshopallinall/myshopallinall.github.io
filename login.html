@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login - MyShop</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f2f5fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    #login-form { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 360px; width: 100%; }
+    #login-form h2 { margin-bottom: 1rem; color: #0070f3; text-align: center; }
+    input, select, button { width: 100%; padding: 0.8rem; margin: 0.5rem 0 1rem 0; border-radius: 6px; border: 1.5px solid #ddd; font-size: 1rem; }
+    button { background-color: #0070f3; color: white; font-weight: bold; border: none; cursor: pointer; transition: background-color 0.25s ease; }
+    button:hover { background-color: #005bb5; }
+    .error { color: #e74c3c; margin-bottom: 1rem; font-weight: bold; }
+    .success { color: #27ae60; margin-bottom: 1rem; font-weight: bold; }
+    .link { color: #0070f3; text-align: right; font-size: 0.98rem; margin-bottom: 0.6rem; text-decoration: underline; cursor: pointer;}
+  </style>
+</head>
+<body>
+<form id="login-form">
+  <h2>Login</h2>
+  <div id="message"></div>
+  <input type="text" id="name" placeholder="Name (for profile table)" required />
+  <input type="email" id="email" placeholder="Email" required />
+  <input type="password" id="password" placeholder="Password" required />
+  <select id="role">
+    <option value="customer">Customer</option>
+    <option value="seller">Seller</option>
+  </select>
+  <button type="submit">Login</button>
+  <div class="link" onclick="window.location.href='signup.html'">New user? Sign up</div>
+</form>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  window.onload = function() {
+    const supabase = window.supabase.createClient(
+      'https://wamqheltqmufuzrqlxlb.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+    );
+
+    const form = document.getElementById('login-form');
+    const messageDiv = document.getElementById('message');
+    form.onsubmit = async function(e) {
+      e.preventDefault();
+      messageDiv.textContent = '';
+      messageDiv.className = '';
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const role = document.getElementById('role').value;
+      try {
+        messageDiv.textContent = "Signing in, please wait...";
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        const user = data.user;
+        // Insert profile row if not exists
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+        if (!profile) {
+          await supabase.from('profiles').insert([{
+            id: user.id,
+            name,
+            email,
+            role,
+            created_at: new Date()
+          }]);
+        }
+        messageDiv.textContent = "Login successful!";
+        messageDiv.className = "success";
+        setTimeout(() => {
+          if (role === "seller") window.location.href = "seller.html";
+          else window.location.href = "customer.html";
+        }, 1500);
+      } catch (err) {
+        messageDiv.textContent = "Error: " + err.message;
+        messageDiv.className = 'error';
+      }
+    };
+  }
+</script>
+</body>
+</html>

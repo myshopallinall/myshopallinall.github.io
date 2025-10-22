@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Seller Order Management</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 2rem; background: #f4f8fc; }
+    h1 { color: #0070f3; margin-bottom: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; box-shadow: 0 1px 6px #ccc; background: white; }
+    th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
+    th { background: #eef5ff; }
+    button { padding: 6px 14px; margin-right: 6px; border: none; border-radius: 5px; color: white; cursor: pointer; }
+    .btn-confirm { background: #27ae60; }
+    .btn-deliver { background: #3498db; }
+    .btn-invoice { background: #e67e22; }
+  </style>
+</head>
+<body>
+<h1>Seller Order Management</h1>
+<table id="orders-table">
+  <thead>
+  <tr>
+    <th>Order ID</th>
+    <th>Customer</th>
+    <th>Status</th>
+    <th>Created At</th>
+    <th>Actions</th>
+  </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<div id="invoice-modal" style="display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%); background:white; padding:20px; border-radius:8px; box-shadow:0 0 15px rgba(0,0,0,0.3); max-width:600px; max-height:80vh; overflow:auto; z-index:100;">
+  <button onclick="closeInvoice()" style="float:right; background:none; border:none; font-size:22px; cursor:pointer;">×</button>
+  <button onclick="printInvoice()" style="float:right; margin-right:10px; background:#3498db; color:#fff; border:none; border-radius:5px; font-size:15px; padding:5px 14px; cursor:pointer;">Print</button>
+  <div style="clear:both"></div>
+  <div id="invoice-html"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  async function loadSellerOrders() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('Please login first!');
+      window.location.href = 'login.html';
+      return;
+    }
+    const { data: orders, error } = await supabase.from('orders')
+      .select(`
+        id,
+        customer_id,
+        total,
+        status,
+        created_at,
+        profiles:customer_id(name, address, email),
+        order_items(
+          id,
+          product_id,
+          quantity,
+          price,
+          products(name, seller_id),
+          profiles_seller: seller_id (id, name, address, email)
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      alert('Failed to load orders: ' + error.message);
+      return;
+    }
+
+    const sellerOrders = orders.filter(order =>
+      order.order_items.some(item =>
+        item.profiles_seller && item.profiles_seller.id === user.id
+      )
+    );
+    const tbody = document.querySelector('#orders-table tbody');
+    tbody.innerHTML = '';
+    sellerOrders.forEach(order => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${order.id}</td>
+        <td>${order.profiles.name}</td>
+        <td>${order.status}</td>
+        <td>${new Date(order.created_at).toLocaleString()}</td>
+        <td>
+          ${order.status === 'pending' ? `<button class="btn-confirm" onclick="updateOrderStatus(${order.id}, 'confirmed')">Confirm</button>` : ''}
+          ${order.status === 'confirmed' ? `<button class="btn-deliver" onclick="updateOrderStatus(${order.id}, 'delivered')">Mark Delivered</button>` : ''}
+          <button class="btn-invoice" onclick="showInvoice(${order.id})">Invoice</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function updateOrderStatus(orderId, newStatus) {
+    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+    if (error) {
+      alert('Failed to update order: ' + error.message);
+    } else {
+      alert('Order updated to ' + newStatus);
+      loadSellerOrders();
+    }
+  }
+
+  async function showInvoice(orderId) {
+    const { data: order, error } = await supabase.from('orders')
+      .select(`
+        id,
+        total,
+        status,
+        created_at,
+        profiles:customer_id(name, address, email),
+        order_items(
+          quantity,
+          price,
+          products(name),
+          profiles_seller: seller_id(name, address, email)
+        )
+      `)
+      .eq('id', orderId)
+      .single();
+
+    if (error) {
+      alert('Failed to load invoice: ' + error.message);
+      return;
+    }
+
+    let html = `
+      <h2>Invoice #${order.id}</h2>
+      <h3>Status: ${order.status}</h3>
+      <h3>Date: ${new Date(order.created_at).toLocaleString()}</h3>
+      <hr>
+      <h4>Seller Info</h4>
+      <div>Name: ${order.order_items[0]?.profiles_seller?.name || ''}</div>
+      <div>Email: ${order.order_items[0]?.profiles_seller?.email || ''}</div>
+      <div>Address: ${order.order_items[0]?.profiles_seller?.address || ''}</div>
+      <hr>
+      <h4>Customer Info</h4>
+      <div>Name: ${order.profiles.name || ''}</div>
+      <div>Email: ${order.profiles.email || ''}</div>
+      <div>Address: ${order.profiles.address || ''}</div>
+      <hr>
+      <table border="1" cellpadding="4" cellspacing="0" width="100%">
+        <thead>
+          <tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr>
+        </thead>
+        <tbody>
+    `;
+    order.order_items.forEach(item => {
+      html += `<tr>
+        <td>${item.products.name}</td>
+        <td>${item.quantity}</td>
+        <td>₹${item.price}</td>
+        <td>₹${item.price * item.quantity}</td>
+      </tr>`;
+    });
+    html += `</tbody></table><hr><h3>Total: ₹${order.total}</h3>`;
+
+    document.getElementById('invoice-html').innerHTML = html;
+    document.getElementById('invoice-modal').style.display = 'block';
+  }
+
+  function closeInvoice() {
+    document.getElementById('invoice-modal').style.display = 'none';
+  }
+
+  function printInvoice() {
+    const invoiceContent = document.getElementById('invoice-html').innerHTML;
+    const printWindow = window.open('', '', 'width=800,height=700');
+    printWindow.document.write('<html><head><title>Invoice</title>');
+    printWindow.document.write('<style>body{font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;}</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(invoiceContent);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  }
+
+  window.onload = loadSellerOrders;
+</script>
+</body>
+</html>

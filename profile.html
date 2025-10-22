@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Update Profile - MyShop</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f2f5fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    #profile-form { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 440px; width: 100%; }
+    #profile-form h2 { margin-bottom: 1rem; color: #0070f3; text-align: center; }
+    input, button { width: 100%; padding: 0.8rem; margin: 0.5rem 0 1rem 0; border-radius: 6px; border: 1.5px solid #ddd; font-size: 1rem; }
+    button { background-color: #0070f3; color: white; font-weight: bold; border: none; cursor: pointer; transition: background-color 0.25s ease; }
+    button:hover { background-color: #005bb5; }
+    .message { font-weight: bold; margin-bottom: 1rem; text-align: center; }
+    .success { color: #27ae60; }
+    .error { color: #e74c3c; }
+  </style>
+</head>
+<body>
+<form id="profile-form">
+  <h2>Update Profile</h2>
+  <div id="message" class="message"></div>
+  <input type="text" id="name" placeholder="Name" required />
+  <input type="email" id="email" placeholder="Email" disabled />
+  <input type="text" id="address" placeholder="Address" />
+  <input type="tel" id="phone" placeholder="Phone" />
+  <button type="submit">Save</button>
+</form>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  const form = document.getElementById('profile-form');
+  const messageDiv = document.getElementById('message');
+
+  async function loadProfile() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('Please login first!');
+      window.location.href = 'login.html';
+      return;
+    }
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('name, email, address, phone')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      messageDiv.textContent = 'Failed to load profile: ' + error.message;
+      messageDiv.className = 'message error';
+      return;
+    }
+
+    document.getElementById('name').value = data.name || '';
+    document.getElementById('email').value = data.email || '';
+    document.getElementById('address').value = data.address || '';
+    document.getElementById('phone').value = data.phone || '';
+  }
+
+  form.onsubmit = async function(e) {
+    e.preventDefault();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('Please login first!');
+      window.location.href = 'login.html';
+      return;
+    }
+    const name = document.getElementById('name').value.trim();
+    const address = document.getElementById('address').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+
+    const { error } = await supabase.from('profiles').upsert({
+      id: user.id,
+      name,
+      address,
+      phone
+    });
+
+    if (error) {
+      messageDiv.textContent = 'Update failed: ' + error.message;
+      messageDiv.className = 'message error';
+    } else {
+      messageDiv.textContent = 'Profile updated successfully!';
+      messageDiv.className = 'message success';
+    }
+  };
+
+  window.onload = loadProfile;
+</script>
+</body>
+</html>

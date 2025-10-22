@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supabase Signup Example</title>
+</head>
+<body>
+    <h2>Supabase Signup Form</h2>
+    <form id="signup-form">
+        <input type="email" id="email" placeholder="Email" required />
+        <input type="password" id="password" placeholder="Password" required />
+        <button type="submit">Sign Up</button>
+    </form>
+    <div id="result"></div>
+
+    <!-- Supabase JS CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
+<script>
+    // Initialize Supabase client
+    const supabaseUrl = 'https://wamqheltqmufuzrqlxlb.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY';
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+    document.getElementById('signup-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const resultDiv = document.getElementById('result');
+        
+        resultDiv.textContent = 'Signing up...';
+
+        // 1. AUTHENTICATION: Create user in auth.users
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+                data: {
+                    signup_source: 'web' // optional metadata
+                }
+            }
+        });
+
+        if (authError) {
+            resultDiv.textContent = 'Error during sign up: ' + authError.message;
+            return;
+        }
+
+        // Get the newly created user's data (if the session was created immediately)
+        const user = authData.user || authData.session?.user;
+        
+        if (user) {
+            
+            // 2. DATABASE INSERTION: Insert profile data into public.profiles table
+            // NOTE: Since your current HTML doesn't have a role input, 
+            // we'll default it, but ideally you'd read it from the form.
+            const defaultRole = 'customer'; 
+            
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .insert([
+                    { 
+                        id: user.id, 
+                        email: user.email, 
+                        role: defaultRole,
+                        // 'name' column is null here unless you add an input field
+                    }
+                ]);
+
+            if (profileError) {
+                // IMPORTANT: The user is created, but the profile failed to insert.
+                console.error("Profile insertion error:", profileError.message);
+                resultDiv.textContent = 'Sign up successful, but profile data failed to save. Please contact support.';
+                return;
+            }
+            
+            resultDiv.textContent = 'Sign up successful! Check your email for confirmation and log in.';
+        } else {
+             // This branch typically executes if email confirmation is required, and no session is created yet.
+             resultDiv.textContent = 'Sign up successful! Please check your email to confirm your account.';
+        }
+    });
+</script>
+</body>
+</html>

@@ -26,6 +26,18 @@
     .btn-confirm { background: #27ae60; }
     .btn-deliver { background: #3498db; }
     .btn-invoice { background: #e67e22; }
+    .btn-delivery-info { background: #9b59b6; }
+    .delivered-status { color: #27ae60; font-weight: bold; }
+    .paid-status { color: #005bb5; font-weight: bold; }
+    .modal {
+      display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%);
+      background:white; padding:20px; border-radius:8px; box-shadow:0 0 15px rgba(0,0,0,0.3);
+      max-width:600px; max-height:80vh; overflow:auto; z-index:100;
+    }
+    .modal-header { font-weight:bold; font-size:20px; margin-bottom:10px; }
+    .modal-close { float:right; background:none; border:none; font-size:22px; cursor:pointer; }
+    .modal-print { float:right; margin-right:10px; background:#3498db; color:#fff; border:none; border-radius:5px; font-size:15px; padding:5px 14px; cursor:pointer; }
+    .modal-content { clear:both; margin-top:8px;}
   </style>
 </head>
 <body>
@@ -45,11 +57,16 @@
   <tbody></tbody>
 </table>
 
-<div id="invoice-modal" style="display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%); background:white; padding:20px; border-radius:8px; box-shadow:0 0 15px rgba(0,0,0,0.3); max-width:600px; max-height:80vh; overflow:auto; z-index:100;">
-  <button id="close-invoice" style="float:right; background:none; border:none; font-size:22px; cursor:pointer;">×</button>
-  <button id="print-invoice" style="float:right; margin-right:10px; background:#3498db; color:#fff; border:none; border-radius:5px; font-size:15px; padding:5px 14px; cursor:pointer;">Print</button>
-  <div style="clear:both"></div>
-  <div id="invoice-html"></div>
+<div id="delivery-modal" class="modal">
+  <button id="close-delivery" class="modal-close">×</button>
+  <div class="modal-header">Delivery Details</div>
+  <div class="modal-content" id="delivery-html"></div>
+</div>
+<div id="invoice-modal" class="modal">
+  <button id="close-invoice" class="modal-close">×</button>
+  <button id="print-invoice" class="modal-print">Print</button>
+  <div class="modal-header">Invoice Details</div>
+  <div class="modal-content" id="invoice-html"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -113,7 +130,12 @@
       tr.innerHTML = `
         <td>${order.id}</td>
         <td>${order.profiles.name}</td>
-        <td>${order.status}</td>
+        <td>
+          ${order.status === 'delivered'
+            ? '<span class="delivered-status">Delivered & Paid</span>'
+            : order.status
+          }
+        </td>
         <td>${new Date(order.created_at).toLocaleString()}</td>
         <td>${hsnCodes}</td>
         <td></td>
@@ -122,6 +144,14 @@
 
       const actionTd = tr.querySelector('td:last-child');
 
+      // Delivery Details button (always available)
+      const deliveryBtn = document.createElement('button');
+      deliveryBtn.className = 'btn-delivery-info';
+      deliveryBtn.textContent = 'Delivery Details';
+      deliveryBtn.onclick = () => showDeliveryDetails(order);
+      actionTd.appendChild(deliveryBtn);
+
+      // Confirm / Mark Delivered logic
       if (order.status === 'pending') {
         const confirmBtn = document.createElement('button');
         confirmBtn.className = 'btn-confirm';
@@ -138,12 +168,60 @@
         actionTd.appendChild(deliverBtn);
       }
 
+      // Invoice button (always available)
       const invoiceBtn = document.createElement('button');
       invoiceBtn.className = 'btn-invoice';
-      invoiceBtn.textContent = 'Invoice';
+      invoiceBtn.textContent = 'Invoice Details';
       invoiceBtn.onclick = () => showInvoice(order.id);
       actionTd.appendChild(invoiceBtn);
     });
+  }
+
+  function showDeliveryDetails(order) {
+    let deliveryStatus = '';
+    if (order.status === 'delivered') {
+      deliveryStatus = '<span class="delivered-status">Delivered & Paid</span>';
+    } else if (order.status === 'confirmed') {
+      deliveryStatus = '<span style="color:#3498db;font-weight:bold;">Confirmed but not delivered</span>';
+    } else if (order.status === 'pending') {
+      deliveryStatus = '<span style="color:#e67e22;font-weight:bold;">Pending confirmation</span>';
+    } else {
+      deliveryStatus = order.status;
+    }
+
+    let html = `
+      <div><strong>Order ID:</strong> ${order.id}</div>
+      <div><strong>Status:</strong> ${deliveryStatus}</div>
+      <div><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</div>
+      <div><strong>Customer Name:</strong> ${order.profiles.name || ''}</div>
+      <div><strong>Email:</strong> ${order.profiles.email || ''}</div>
+      <div><strong>Address:</strong> ${order.profiles.address || ''}</div>
+      <hr>
+      <table border="1" cellpadding="4" cellspacing="0" width="100%">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>HSN Code</th>
+            <th>Qty</th>
+            <th>Unit Price</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    order.order_items.forEach(item => {
+      html += `<tr>
+        <td>${item.products.name}</td>
+        <td>${item.hsn_code || '-'}</td>
+        <td>${item.quantity}</td>
+        <td>₹${item.price}</td>
+        <td>₹${item.price * item.quantity}</td>
+      </tr>`;
+    });
+    html += `</tbody></table><hr><h3>Total: ₹${order.total}</h3>`;
+
+    document.getElementById('delivery-html').innerHTML = html;
+    document.getElementById('delivery-modal').style.display = 'block';
   }
 
   async function updateOrderStatus(orderId, newStatus) {
@@ -195,9 +273,16 @@
     }
 
     let sellerInfo = order.order_items[0]?.profiles_seller || {};
+    let statusDisplay = '';
+    if (order.status === 'delivered') {
+      statusDisplay = '<span class="delivered-status">Delivered & Paid</span>';
+    } else {
+      statusDisplay = order.status.charAt(0).toUpperCase() + order.status.slice(1);
+    }
+
     let html = `
       <h2>Invoice #${order.id}</h2>
-      <h3>Status: ${order.status}</h3>
+      <h3>Status: ${statusDisplay}</h3>
       <h3>Date: ${new Date(order.created_at).toLocaleString()}</h3>
       <hr>
       <h4>Seller Info</h4>
@@ -236,12 +321,14 @@
   function closeInvoice() {
     document.getElementById('invoice-modal').style.display = 'none';
   }
-
+  function closeDelivery() {
+    document.getElementById('delivery-modal').style.display = 'none';
+  }
   function printInvoice() {
     const invoiceContent = document.getElementById('invoice-html').innerHTML;
     const printWindow = window.open('', '', 'width=800,height=700');
     printWindow.document.write('<html><head><title>Invoice</title>');
-    printWindow.document.write('<style>body{font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;}</style>');
+    printWindow.document.write('<style>body{font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;} .delivered-status{color:#27ae60;font-weight:bold;} .paid-status{color:#005bb5;font-weight:bold;}</style>');
     printWindow.document.write('</head><body>');
     printWindow.document.write(invoiceContent);
     printWindow.document.write('</body></html>');
@@ -252,6 +339,7 @@
 
   document.getElementById('close-invoice').onclick = closeInvoice;
   document.getElementById('print-invoice').onclick = printInvoice;
+  document.getElementById('close-delivery').onclick = closeDelivery;
 
   window.onload = loadSellerOrders;
 </script>

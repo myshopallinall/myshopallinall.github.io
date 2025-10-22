@@ -9,42 +9,29 @@
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Montserrat', Arial, sans-serif; background: #f6f7fa; margin:0; }
-    .header {
-      background: linear-gradient(90deg,#232f3e 70%,#0070f3 100%);
-      color: #fff; padding: 1rem 2.4rem; display: flex; align-items: center; justify-content: space-between;
-      box-shadow:0 3px 8px #0070f335; position:sticky; top:0; z-index:99;
-    }
+    .header { background: linear-gradient(90deg,#232f3e 70%,#0070f3 100%); color: #fff; padding: 1rem 2.4rem; display: flex; align-items: center; justify-content: space-between; box-shadow:0 3px 8px #0070f335; position:sticky; top:0; z-index:99; }
     .header h1 { font-size:2.1rem; letter-spacing:1px; margin:0;}
-    .header .nav-group button {
-      margin-left:12px; font-size:1rem; padding:8px 17px; border:none; border-radius:3px; cursor:pointer;
-      background:#ffe600; color:#232f3e; font-weight:bold; box-shadow:0 2px 6px #0001;
-      transition:background 0.2s;
-    }
+    .header .nav-group button { margin-left:12px; font-size:1rem; padding:8px 17px; border:none; border-radius:3px; cursor:pointer; background:#ffe600; color:#232f3e; font-weight:bold; box-shadow:0 2px 6px #0001; transition:background 0.2s;}
     .header .nav-group button:hover { background:#f2c700; }
-    main {max-width:1200px; margin:2rem auto 1rem;}
+    main { max-width:1200px; margin:2rem auto 1rem;}
     .products-section {margin-top:1.5rem;}
     .products-header {display:flex;justify-content:space-between;align-items:center;}
     .products-header h2 {font-size:1.45rem;margin-bottom:0.7rem;}
     .search-sort-wrap { display:flex; gap:12px; align-items:center;}
-    .search-bar {padding:7px 15px;font-size:1rem;border-radius:5px; border:1px solid #ccc;}
-    .sort-select {padding:7px 8px;border-radius:5px; border:1px solid #ccc;font-size:1rem;}
+    .search-bar { padding:7px 15px; font-size:1rem; border-radius:5px; border:1px solid #ccc;}
+    .sort-select { padding:7px 8px; border-radius:5px; border:1px solid #ccc; font-size:1rem;}
     #products-list { display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.6rem;}
-    .product-card {
-      background:#fff; border-radius:12px; padding:1.3rem 1rem; box-shadow:0 2px 14px #232f3e10;
-      display:flex;flex-direction:column;align-items:center;transition:box-shadow 0.18s,transform 0.18s;
-      position:relative; min-height:330px;
-    }
+    .product-card { background:#fff; border-radius:12px; padding:1.3rem 1rem; box-shadow:0 2px 14px #232f3e10; display:flex; flex-direction:column; align-items:center; transition:box-shadow 0.18s,transform 0.18s; position:relative; min-height:330px;}
     .product-card:hover { box-shadow: 0 6px 18px #232f3e24; transform:translateY(-5px);}
     .badge {position:absolute;top:12px;right:12px;background:#e91e63;color:#fff;font-size:0.92rem;padding:5px 11px;border-radius:20px;font-weight:600;box-shadow:0 1px 5px #e91e6322;}
     .product-card img { width:128px;height:128px;border-radius:7px;object-fit:cover;background:#f6f7fa;margin-bottom:0.9rem; }
     .product-name { font-weight:700; margin-bottom:0.35rem; color:#232f3e; font-size:1.09rem;}
     .product-price { color:#e91e63; font-weight:bold; font-size:1.12rem;}
     .product-desc { margin:0.5rem 0 0.1rem 0;color:#555;font-size:0.97rem;word-break:break-word;}
-    .add-cart-btn {
-      margin-top:1.05rem; padding:8px 30px; background:#232f3e; color:#ffe600; border-radius:5px; border:none;
-      font-weight:700; letter-spacing:0.5px; font-size:1.05rem; cursor:pointer; box-shadow:0 2px 7px #232f3e14; transition:background 0.18s;
-    }
-    .add-cart-btn:hover { background:#0070f3; color:#fff;}
+    .add-cart-btn { margin-top:1.05rem; padding:8px 30px; background:#232f3e; color:#ffe600; border-radius:5px; border:none; font-weight:700; letter-spacing:0.5px; font-size:1.05rem; cursor:pointer; box-shadow:0 2px 7px #232f3e14; transition:background 0.18s;}
+    .add-cart-btn:disabled { background:#bbb; color:#fff; cursor:not-allowed; }
+    .add-cart-btn:hover:enabled { background:#0070f3; color:#fff;}
+    .stock-label { display:block; margin-top:8px; font-size:0.97rem;}
     .section {background:#fff;padding:2rem 1.5rem;border-radius:9px;box-shadow:0 2px 11px #232f3e12;margin-bottom:1rem;}
     table { width:100%; border-collapse:collapse; margin:1.2rem auto 0;background:#fff;}
     th,td { padding:10px 8px; border:1px solid #eee; font-size:1rem;}
@@ -123,10 +110,15 @@
   }
 
   async function loadProducts() {
-    const { data, error } = await supabase.from('products').select('*');
-    allProducts = (error || !data) ? [] : data;
-    populateCategories();
-    renderProducts();
+    try {
+      const { data, error } = await supabase.from('products').select('*');
+      allProducts = (error || !data) ? [] : data;
+      populateCategories();
+      renderProducts();
+    } catch (err) {
+      console.error('Unexpected error loading products:', err);
+      allProducts = [];
+    }
   }
 
   function populateCategories() {
@@ -146,16 +138,17 @@
     const categoryFilter = document.getElementById('categorySelect').value;
     const sortBy = document.getElementById('sortSelect').value;
 
-    let filtered = allProducts.filter(p =>
-      (p.name.toLowerCase().includes(searchText) ||
-      (p.description && p.description.toLowerCase().includes(searchText))) &&
-      (categoryFilter === '' || p.category === categoryFilter)
-    );
+    let filtered = allProducts.filter(p => {
+      const nameMatch = p.name ? p.name.toLowerCase().includes(searchText) : false;
+      const descMatch = p.description ? p.description.toLowerCase().includes(searchText) : false;
+      const catMatch = categoryFilter === '' || p.category === categoryFilter;
+      return (nameMatch || descMatch) && catMatch;
+    });
 
-    if (sortBy === 'name_asc') filtered.sort((a, b) => a.name.localeCompare(b.name));
-    else if (sortBy === 'name_desc') filtered.sort((a, b) => b.name.localeCompare(a.name));
-    else if (sortBy === 'price_asc') filtered.sort((a, b) => a.price - b.price);
-    else if (sortBy === 'price_desc') filtered.sort((a, b) => b.price - a.price);
+    if (sortBy === 'name_asc') filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    else if (sortBy === 'name_desc') filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+    else if (sortBy === 'price_asc') filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+    else if (sortBy === 'price_desc') filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
     else if (sortBy === 'category_asc') filtered.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
     else if (sortBy === 'category_desc') filtered.sort((a, b) => (b.category || '').localeCompare(a.category || ''));
 
@@ -166,22 +159,39 @@
       return;
     }
     filtered.forEach(prod => {
-      const div = document.createElement('div');
+      const isOutStock = prod.stock === null || prod.stock === undefined || prod.stock <= 0;
+      const addDisabled = isOutStock ? 'disabled' : '';
+      let div = document.createElement('div');
       div.className = 'product-card';
       div.innerHTML = `
-        <div class="badge">${prod.price < 500 ? "Best Seller" : "Featured"}</div>
-        <img src="${prod.image_url || 'https://via.placeholder.com/128'}" alt="${prod.name}" />
-        <div class="product-name">${prod.name}</div>
-        <div class="product-price">₹${prod.price}</div>
+        <div class="badge">${prod.price && prod.price < 500 ? "Best Seller" : "Featured"}</div>
+        <img src="${prod.image_url || 'https://via.placeholder.com/128'}" alt="${prod.name || ''}" />
+        <div class="product-name">${prod.name || '-'}</div>
+        <div class="product-price">₹${prod.price !== undefined ? prod.price : '-'}</div>
         <div class="product-desc">${prod.description || ''}</div>
         <div><em>Category: ${prod.category || 'N/A'}</em></div>
-        <button class="add-cart-btn" onclick="addToCart('${prod.id}', ${prod.price})">Add to Cart</button>
+        <span class="stock-label" style="color:${isOutStock ? '#e91e63':'#158a00'};">
+          ${isOutStock ? 'Out of Stock' : ('In Stock: ' + prod.stock)}
+        </span>
+        <button class="add-cart-btn" ${addDisabled} onclick="addToCart('${prod.id}')">
+          ${isOutStock ? 'Out of Stock' : 'Add to Cart'}
+        </button>
       `;
       container.appendChild(div);
     });
   };
 
-  window.addToCart = async function(productId, productPrice) {
+  window.addToCart = async function(productId) {
+    const product = allProducts.find(p => p.id == productId);
+    if (!product) {
+      alert('Product not found!');
+      return;
+    }
+    if (!product.stock || product.stock <= 0) {
+      alert('Sorry, this product is currently out of stock.');
+      return;
+    }
+
     try {
       const { data: item, error: selectError } = await supabase
         .from('cart')
@@ -190,7 +200,12 @@
         .eq('product_id', productId)
         .maybeSingle();
       if (selectError) throw selectError;
+
       if (item) {
+        if (item.quantity >= product.stock) {
+          alert('You have reached the maximum available stock for this product.');
+          return;
+        }
         const { error: updateError } = await supabase
           .from('cart')
           .update({ quantity: item.quantity + 1 })
@@ -242,36 +257,40 @@
     loadCart();
   };
 
-  // Razorpay payment and order logic
+  // Razorpay payment integration
   window.startPayment = function() {
     if (!latestCart.length || latestTotal === 0) {
       alert('Cart is empty!');
       return;
     }
+    // Prefill customer details, change email if you fetch it from profile table
     let options = {
-      key: "rzp_live_RS6JXqKrLXCdOh", // Your Razorpay Key ID
-      amount: latestTotal * 100,
+      key: "rzp_live_RS6JXqKrLXCdOh", // Replace with your Razorpay Key ID
+      amount: latestTotal * 100, // Amount must be in paise
       currency: "INR",
       name: "MyShop",
       description: "Order Payment",
       handler: function(response) {
+        // Razorpay payment_id available in response.razorpay_payment_id
         placeOrder(latestCart, latestTotal, response.razorpay_payment_id);
       },
       prefill: {
-        email: "customer@domain.com",
+        email: "customer@domain.com", // Optionally update with logged-in user email
       },
-      theme: { color: "#0070f3" },
+      theme: { color: "#0070f3" }
     };
     let rzp = new Razorpay(options);
     rzp.open();
   };
 
+  // Save paid order in Supabase
   window.placeOrder = async function(cartItems, totalAmount, paymentId) {
     try {
       if (!cartItems.length) {
         alert("Cart is empty!");
         return;
       }
+      // Insert order
       const { data: order, error: orderError } = await supabase
         .from("orders")
         .insert([
@@ -283,6 +302,7 @@
         alert("Order failed! " + (orderError?.message || ""));
         return;
       }
+      // Save order items
       for (let item of cartItems) {
         await supabase.from("order_items").insert([
           {
@@ -290,12 +310,12 @@
             product_id: item.product_id,
             seller_id: item.products.seller_id,
             quantity: item.quantity,
-            price: item.products.price,
+            price: item.products.price
           },
         ]);
       }
       await supabase.from("cart").delete().eq("customer_id", customerId);
-      alert("Order placed successfully!");
+      alert("Order placed and payment successful!");
       loadCart();
       loadOrders();
     } catch (err) {
@@ -306,7 +326,7 @@
   async function loadOrders() {
     const { data: orders, error } = await supabase
       .from("orders")
-      .select("id, total, created_at, status, order_items(product_id, quantity, price, products(name))")
+      .select("id, total, created_at, status, payment_id, order_items(product_id, quantity, price, products(name))")
       .eq("customer_id", customerId)
       .order("created_at", { ascending: false });
     const container = document.getElementById("orders-list");
@@ -317,10 +337,11 @@
     let html = "";
     orders.forEach((order) => {
       html += `<div style="margin-bottom:1.3rem;">
-        <strong>Order #${order.id}</strong> <span style="color:#888;">(${order.created_at
-          .slice(0, 19)
-          .replace("T", " ")})</span>
-        <span style="color:#e91e63;">Status: ${order.status}</span> <span style="color:#0070f3;float:right;">Total: ₹${order.total}</span><br>
+        <strong>Order #${order.id}</strong>
+        <span style="color:#888;">(${order.created_at.slice(0, 19).replace("T", " ")})</span>
+        <span style="color:#e91e63;">Status: ${order.status}</span>
+        <span style="color:#15a100; margin-left:16px;">Payment ID: ${order.payment_id || '-'}</span>
+        <span style="color:#0070f3;float:right;">Total: ₹${order.total}</span><br>
         <table><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr>`;
       order.order_items.forEach((item) => {
         html += `<tr>

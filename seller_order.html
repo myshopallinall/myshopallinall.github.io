@@ -85,6 +85,8 @@
     setTimeout(() => { div.style.display = 'none'; }, 2500);
   }
 
+  let currentUser = null;
+
   async function loadSellerOrders() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -92,6 +94,8 @@
       window.location.href = 'login.html';
       return;
     }
+    currentUser = user;
+
     const { data: orders, error } = await supabase.from('orders')
       .select(`
         id,
@@ -117,6 +121,7 @@
       return;
     }
 
+    // Only show orders where at least one item belongs to the seller
     const sellerOrders = orders.filter(order =>
       order.order_items.some(item =>
         item.profiles_seller && item.profiles_seller.id === user.id
@@ -125,7 +130,10 @@
     const tbody = document.querySelector('#orders-table tbody');
     tbody.innerHTML = '';
     sellerOrders.forEach(order => {
-      const hsnCodes = order.order_items.map(item => item.hsn_code || '-').join(', ');
+      // HSN codes only from this seller's items
+      const itemCodes = order.order_items.filter(
+        item => item.profiles_seller && item.profiles_seller.id === user.id
+      ).map(item => item.hsn_code || '-').join(', ');
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${order.id}</td>
@@ -137,7 +145,7 @@
           }
         </td>
         <td>${new Date(order.created_at).toLocaleString()}</td>
-        <td>${hsnCodes}</td>
+        <td>${itemCodes}</td>
         <td></td>
       `;
       tbody.appendChild(tr);
@@ -148,7 +156,7 @@
       const deliveryBtn = document.createElement('button');
       deliveryBtn.className = 'btn-delivery-info';
       deliveryBtn.textContent = 'Delivery Details';
-      deliveryBtn.onclick = () => showDeliveryDetails(order);
+      deliveryBtn.onclick = () => showDeliveryDetails(order, user.id);
       actionTd.appendChild(deliveryBtn);
 
       // Confirm / Mark Delivered logic
@@ -172,12 +180,17 @@
       const invoiceBtn = document.createElement('button');
       invoiceBtn.className = 'btn-invoice';
       invoiceBtn.textContent = 'Invoice Details';
-      invoiceBtn.onclick = () => showInvoice(order.id);
+      invoiceBtn.onclick = () => showInvoice(order.id, user.id);
       actionTd.appendChild(invoiceBtn);
     });
   }
 
-  function showDeliveryDetails(order) {
+  function showDeliveryDetails(order, sellerId) {
+    // Filter order_items for just this seller
+    const filteredItems = order.order_items.filter(
+      item => item.profiles_seller && item.profiles_seller.id === sellerId
+    );
+
     let deliveryStatus = '';
     if (order.status === 'delivered') {
       deliveryStatus = '<span class="delivered-status">Delivered & Paid</span>';
@@ -209,7 +222,7 @@
         </thead>
         <tbody>
     `;
-    order.order_items.forEach(item => {
+    filteredItems.forEach(item => {
       html += `<tr>
         <td>${item.products.name}</td>
         <td>${item.hsn_code || '-'}</td>
@@ -218,7 +231,9 @@
         <td>₹${item.price * item.quantity}</td>
       </tr>`;
     });
-    html += `</tbody></table><hr><h3>Total: ₹${order.total}</h3>`;
+    // Total only for seller's items
+    const total = filteredItems.reduce((sum, i) => sum + (i.quantity * i.price), 0);
+    html += `</tbody></table><hr><h3>Total: ₹${total}</h3>`;
 
     document.getElementById('delivery-html').innerHTML = html;
     document.getElementById('delivery-modal').style.display = 'block';
@@ -248,7 +263,7 @@
     }
   }
 
-  async function showInvoice(orderId) {
+  async function showInvoice(orderId, sellerId) {
     const { data: order, error } = await supabase.from('orders')
       .select(`
         id,
@@ -260,8 +275,8 @@
           quantity,
           price,
           hsn_code,
-          products(name),
-          profiles_seller: seller_id(name, address, email, gst_number, pan_number)
+          products(name, seller_id),
+          profiles_seller: seller_id(id, name, address, email, gst_number, pan_number)
         )
       `)
       .eq('id', orderId)
@@ -272,7 +287,11 @@
       return;
     }
 
-    let sellerInfo = order.order_items[0]?.profiles_seller || {};
+    // Filter only the items for this seller
+    const filteredItems = order.order_items.filter(
+      item => item.profiles_seller && item.profiles_seller.id === sellerId
+    );
+    let sellerInfo = filteredItems[0]?.profiles_seller || {};
     let statusDisplay = '';
     if (order.status === 'delivered') {
       statusDisplay = '<span class="delivered-status">Delivered & Paid</span>';
@@ -303,7 +322,7 @@
         </thead>
         <tbody>
     `;
-    order.order_items.forEach(item => {
+    filteredItems.forEach(item => {
       html += `<tr>
         <td>${item.products.name}</td>
         <td>${item.hsn_code || '-'}</td>
@@ -312,7 +331,9 @@
         <td>₹${item.price * item.quantity}</td>
       </tr>`;
     });
-    html += `</tbody></table><hr><h3>Total: ₹${order.total}</h3>`;
+    // Total only for seller's items
+    const total = filteredItems.reduce((sum, i) => sum + (i.quantity * i.price), 0);
+    html += `</tbody></table><hr><h3>Total: ₹${total}</h3>`;
 
     document.getElementById('invoice-html').innerHTML = html;
     document.getElementById('invoice-modal').style.display = 'block';

@@ -39,6 +39,7 @@
     .modal-close { float:right; background:none; border:none; font-size:22px; cursor:pointer; }
     .modal-print { float:right; margin-right:10px; background:#3498db; color:#fff; border:none; border-radius:5px; font-size:15px; padding:5px 14px; cursor:pointer; }
     .modal-content { clear:both; margin-top:8px;}
+    .modal-extra-close { display:block; margin:20px auto 0 auto; background:#e67e22; color:#fff; border:none; border-radius:5px; font-size:16px; padding:7px 38px; cursor:pointer;}
     .prod-status-ind { padding:2px 8px; border-radius:5px; margin-right:3px; font-size:0.98em;}
     .prod-status-pending{background:#ffe600;color:#222;}
     .prod-status-confirmed{background:#3498db;color:#fff;}
@@ -72,6 +73,7 @@
   <button id="print-invoice" class="modal-print">Print</button>
   <div class="modal-header">Invoice Details</div>
   <div class="modal-content" id="invoice-html"></div>
+  <button id="modal-extra-close-btn" class="modal-extra-close">Close</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -109,7 +111,7 @@
         total,
         status,
         created_at,
-        profiles:customer_id(name, address, email),
+        profiles:customer_id(name, address, email, phone),
         order_items(
           id,
           product_id,
@@ -118,7 +120,7 @@
           hsn_code,
           status,
           products(name, seller_id),
-          profiles_seller: seller_id (id, name, address, email, gst_number, pan_number)
+          profiles_seller: seller_id (id, name, address, email, gst_number, pan_number, phone)
         )
       `)
       .order('created_at', { ascending: false });
@@ -158,15 +160,12 @@
       tbody.appendChild(tr);
 
       const actionTd = tr.querySelector('td:last-child');
-
-      // Delivery Details button
       const deliveryBtn = document.createElement('button');
       deliveryBtn.className = 'btn-delivery-info';
       deliveryBtn.textContent = 'Delivery Details';
       deliveryBtn.onclick = () => showDeliveryDetails(order, user.id);
       actionTd.appendChild(deliveryBtn);
 
-      // Invoice button
       const invoiceBtn = document.createElement('button');
       invoiceBtn.className = 'btn-invoice';
       invoiceBtn.textContent = 'Invoice Details';
@@ -175,7 +174,6 @@
     });
   }
 
-  // --- Show delivery modal; allow marking items as delivered ---
   function showDeliveryDetails(order, sellerId) {
     const filteredItems = order.order_items.filter(
       item => item.profiles_seller && item.profiles_seller.id === sellerId
@@ -197,6 +195,7 @@
       <div><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</div>
       <div><strong>Customer Name:</strong> ${order.profiles.name || ''}</div>
       <div><strong>Email:</strong> ${order.profiles.email || ''}</div>
+      <div><strong>Phone:</strong> ${order.profiles.phone || '-'}</div>
       <div><strong>Address:</strong> ${order.profiles.address || ''}</div>
       <hr>
       <table border="1" cellpadding="4" cellspacing="0" width="100%">
@@ -232,7 +231,6 @@
         </td>
       </tr>`;
     });
-    // Total only for seller's items
     const total = filteredItems.reduce((sum, i) => sum + (i.quantity * i.price), 0);
     html += `</tbody></table><hr><h3>Total: ₹${total}</h3>`;
 
@@ -240,45 +238,17 @@
     document.getElementById('delivery-modal').style.display = 'block';
   }
 
-  // --- Action to mark individual product delivered ---
   window.markProductDelivered = async function(orderItemId) {
     const { error } = await supabase.from('order_items').update({ status: 'delivered' }).eq('id', orderItemId);
     if (error) {
       showStatusMessage('Failed to update product: ' + error.message, '#ffeded', '#a10021');
     } else {
       showStatusMessage('Product marked as delivered.');
-      // Refresh seller orders/modal
       loadSellerOrders();
       document.getElementById('delivery-modal').style.display = 'none';
     }
   };
 
-  // --- Order status update (for entire order, optional/legacy) ---
-  async function updateOrderStatus(orderId, newStatus) {
-    let actionMsg = '';
-    if (newStatus === 'confirmed') {
-      actionMsg = 'Order confirmation processing...';
-    } else if (newStatus === 'delivered') {
-      actionMsg = 'Delivery confirmation processing...';
-    }
-    showStatusMessage(actionMsg);
-
-    const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
-    if (error) {
-      showStatusMessage('Failed to update order: ' + error.message, '#ffeded', '#a10021');
-    } else {
-      showStatusMessage(
-        newStatus === 'confirmed'
-          ? 'Order confirmed!'
-          : newStatus === 'delivered'
-            ? 'Order marked as delivered!'
-            : 'Order updated successfully.'
-      );
-      loadSellerOrders();
-    }
-  }
-
-  // --- Invoice Modal (seller-filtered items only) ---
   async function showInvoice(orderId, sellerId) {
     const { data: order, error } = await supabase.from('orders')
       .select(`
@@ -286,14 +256,14 @@
         total,
         status,
         created_at,
-        profiles:customer_id(name, address, email),
+        profiles:customer_id(name, address, email, phone),
         order_items(
           quantity,
           price,
           hsn_code,
           status,
           products(name, seller_id),
-          profiles_seller: seller_id(id, name, address, email, gst_number, pan_number)
+          profiles_seller: seller_id(id, name, address, email, gst_number, pan_number, phone)
         )
       `)
       .eq('id', orderId)
@@ -304,7 +274,6 @@
       return;
     }
 
-    // Only this seller's items
     const filteredItems = order.order_items.filter(
       item => item.profiles_seller && item.profiles_seller.id === sellerId
     );
@@ -324,6 +293,7 @@
       <h4>Seller Info</h4>
       <div>Name: ${sellerInfo.name || ''}</div>
       <div>Email: ${sellerInfo.email || ''}</div>
+      <div>Phone: ${sellerInfo.phone || '-'}</div>
       <div>Address: ${sellerInfo.address || ''}</div>
       <div>GST Number: ${sellerInfo.gst_number || ''}</div>
       <div>PAN Number: ${sellerInfo.pan_number || ''}</div>
@@ -331,6 +301,7 @@
       <h4>Customer Info</h4>
       <div>Name: ${order.profiles.name || ''}</div>
       <div>Email: ${order.profiles.email || ''}</div>
+      <div>Phone: ${order.profiles.phone || '-'}</div>
       <div>Address: ${order.profiles.address || ''}</div>
       <hr>
       <table border="1" cellpadding="4" cellspacing="0" width="100%">
@@ -379,6 +350,7 @@
   }
 
   document.getElementById('close-invoice').onclick = closeInvoice;
+  document.getElementById('modal-extra-close-btn').onclick = closeInvoice;
   document.getElementById('print-invoice').onclick = printInvoice;
   document.getElementById('close-delivery').onclick = closeDelivery;
 

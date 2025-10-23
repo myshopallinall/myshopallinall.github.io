@@ -43,12 +43,28 @@
     .prod-status-pending{background:#ffe600;color:#222;}
     .prod-status-confirmed{background:#3498db;color:#fff;}
     .prod-status-delivered{background:#27ae60;color:#fff;}
-    @media (max-width: 600px) {
-      main {padding:0;}
-      .section {padding:1rem;}
-      #products-list {grid-template-columns:1fr;}
-      .header {padding:1rem 1rem;}
-      .search-sort-wrap{flex-direction:column;gap:10px;}
+    /* Modal for Return Request */
+    .modal-bg {
+      display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.32); z-index: 6000; justify-content: center; align-items: flex-start;
+    }
+    .modal-bg.active { display: flex; }
+    .modal-returns {
+      background: #fff; border-radius: 11px; max-width: 900px; margin: 48px auto 0; width:96%;
+      box-shadow: 0 10px 40px #16161629; padding: 2.1rem 1rem 1.2rem 1rem; position: relative;
+      animation: popin 0.13s;
+    }
+    @keyframes popin { from {transform:scale(0.98); opacity:0;} to {transform:scale(1); opacity:1;} }
+    .modal-returns h2 { margin-top: 0; }
+    .modal-returns-close {
+      position:absolute; top:15px; right:18px; color:#0070f3; font-size:2.3rem; font-weight:bold; background:none; border:none; cursor:pointer;
+    }
+    #returnForm table { margin:0; }
+    #returnForm button[type="submit"] { margin-top:1rem; }
+    #return-msg { text-align:center; font-weight:700; margin-top:1rem; }
+    @media (max-width: 700px) {
+      .modal-returns {padding: 1rem 0.3rem 1.2rem 0.3rem;}
+      .modal-returns h2 { font-size:1.25rem;}
     }
   </style>
 </head>
@@ -57,6 +73,7 @@
   <h1>MyShop</h1>
   <div class="nav-group">
     <button id="profile-btn">Your Profile</button>
+    <button id="returns-btn">Return Request</button>
     <button id="logout-btn">Logout</button>
   </div>
 </div>
@@ -68,6 +85,9 @@
         <input class="search-bar" id="searchInput" type="text" placeholder="Search products..." oninput="renderProducts()" />
         <select class="sort-select" id="categorySelect" onchange="renderProducts()">
           <option value="">All Categories</option>
+        </select>
+        <select class="sort-select" id="sellerSelect" onchange="renderProducts()">
+          <option value="">All Sellers</option>
         </select>
         <select class="sort-select" id="sortSelect" onchange="renderProducts()">
           <option value="latest">Sort: Latest</option>
@@ -90,8 +110,38 @@
   <div class="section">
     <h2>Your Orders</h2>
     <div id="orders-list"></div>
+    <button id="returns-btn-orders" style="margin-top:15px; padding:10px 22px; font-weight:bold; background:#e91e63; border:none; color:white; border-radius:5px; cursor:pointer;">
+      Request a Return
+    </button>
   </div>
 </main>
+
+<!-- Return Request Modal -->
+<div class="modal-bg" id="returnModalBg">
+  <div class="modal-returns">
+    <button class="modal-returns-close" type="button" onclick="closeReturnModal()">&times;</button>
+    <h2>Request a Return</h2>
+    <p>Only products from orders placed within the last 7 days are eligible.</p>
+    <form id="returnForm">
+      <table>
+        <thead>
+        <tr>
+          <th>Select</th>
+          <th>Order ID</th>
+          <th>Product</th>
+          <th>Order Date</th>
+          <th>Qty</th>
+          <th>Reason</th>
+        </tr>
+        </thead>
+        <tbody id="orderItemsBody"></tbody>
+      </table>
+      <button id="submitReturnBtn" type="submit" disabled>Submit Return Request</button>
+    </form>
+    <div id="return-msg"></div>
+    <div id="yourReturns" style="margin-top:18px"></div>
+  </div>
+</div>
 
 <script>
   const supabase = window.supabase.createClient(
@@ -101,29 +151,73 @@
   let customerId = null;
   let latestCart = [], latestTotal = 0;
   let allProducts = [];
+   let codAcceptMap = {};
 
   async function checkLogin() {
     const { data } = await supabase.auth.getUser();
     if (!data.user) {
-      alert('Please login first!'); window.location.href = 'login.html'; return;
+      alert('Please login first!');
+      window.location.href = 'login.html';
+      return;
     }
     customerId = data.user.id;
     await loadProducts();
-    loadCart();
+await loadOrders();
+loadCart();
     loadOrders();
   }
 
   async function loadProducts() {
-    try {
-      const { data, error } = await supabase.from('products').select('*');
-      allProducts = (error || !data) ? [] : data;
-      populateCategories();
-      renderProducts();
-    } catch (err) {
-      console.error('Unexpected error loading products:', err);
-      allProducts = [];
-    }
+ async function loadOrders() {
+  const { data: orders, error } = await supabase
+    .from("orders")
+    .select("id, total, created_at, status, payment_id, order_items(product_id, quantity, price, status, products(name), courier_name, courier_tracking_number, courier_tracking_url)")
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false });
+
+  const container = document.getElementById("orders-list");
+  if (error || !orders.length) {
+    container.innerHTML = '<div class="order-empty">No orders yet.</div>';
+    return;
   }
+  let html = "";
+  orders.forEach(order => {
+    html += `<div style="margin-bottom:1.3rem;">
+      <strong>Order #${order.id}</strong>
+      <span style="color:#888;">(${order.created_at.slice(0, 19).replace("T", " ")})</span>
+      <span style="color:#e91e63;">Status: ${order.status}</span>
+      <span style="color:#15a100; margin-left:16px;">Payment ID: ${order.payment_id || '-'}</span>
+      <span style="color:#0070f3;float:right;">Total: ₹${order.total}</span><br>
+      <table>
+        <tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th><th>Delivery Status</th><th>Tracking</th></tr>`;
+    order.order_items.forEach(item => {
+      let trackingHtml = '-';
+      if (item.courier_tracking_number) {
+        if (item.courier_tracking_url) {
+          trackingHtml = `<div>${item.courier_name || ''}<br><a href="${item.courier_tracking_url}" target="_blank" rel="noopener noreferrer">${item.courier_tracking_number}</a></div>`;
+        } else {
+          trackingHtml = `<div>${item.courier_name || ''}<br>${item.courier_tracking_number}</div>`;
+        }
+      }
+
+      let prodStatusClass = "prod-status-ind prod-status-pending";
+      if(item.status === "delivered") prodStatusClass = "prod-status-ind prod-status-delivered";
+      else if(item.status === "confirmed") prodStatusClass = "prod-status-ind prod-status-confirmed";
+
+      html += `<tr>
+        <td>${item.products.name}</td>
+        <td>${item.quantity}</td>
+        <td>₹${item.price}</td>
+        <td>₹${item.price * item.quantity}</td>
+        <td><span class="${prodStatusClass}">${item.status || 'pending'}</span></td>
+        <td>${trackingHtml}</td>
+      </tr>`;
+    });
+    html += `</table></div>`;
+  });
+  container.innerHTML = html;
+}
+ }
 
   function populateCategories() {
     const categories = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
@@ -137,17 +231,36 @@
     });
   }
 
-  window.renderProducts = function() {
-    const searchText = document.getElementById('searchInput').value.toLowerCase();
-    const categoryFilter = document.getElementById('categorySelect').value;
-    const sortBy = document.getElementById('sortSelect').value;
 
-    let filtered = allProducts.filter(p => {
-      const nameMatch = p.name ? p.name.toLowerCase().includes(searchText) : false;
-      const descMatch = p.description ? p.description.toLowerCase().includes(searchText) : false;
-      const catMatch = categoryFilter === '' || p.category === categoryFilter;
-      return (nameMatch || descMatch) && catMatch;
-    });
+  function populateSellers() {
+    const sellers = [...new Map(
+  allProducts
+    .filter(p => p.profiles && p.profiles.name)
+    .map(p => [p.seller_id, p.profiles.name])
+).entries()];
+const sellerSelect = document.getElementById('sellerSelect');
+sellerSelect.innerHTML = '<option value="">All Sellers</option>';
+sellers.forEach(([id, name]) => {
+  const option = document.createElement('option');
+  option.value = id;
+  option.textContent = name;
+  sellerSelect.appendChild(option);
+});
+}
+
+ window.renderProducts = function () {
+      const searchText = document.getElementById('searchInput').value.toLowerCase();
+      const categoryFilter = document.getElementById('categorySelect').value;
+      const sellerFilter = document.getElementById('sellerSelect').value;
+      const sortBy = document.getElementById('sortSelect').value;
+
+      let filtered = allProducts.filter(p => {
+        const nameMatch = p.name ? p.name.toLowerCase().includes(searchText) : false;
+        const descMatch = p.description ? p.description.toLowerCase().includes(searchText) : false;
+        const catMatch = categoryFilter === '' || p.category === categoryFilter;
+       const sellerMatch = sellerFilter === '' || p.seller_id === sellerFilter;
+       return (nameMatch || descMatch) && catMatch && sellerMatch;
+      });
 
     if (sortBy === 'name_asc') filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     else if (sortBy === 'name_desc') filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
@@ -174,7 +287,8 @@
         <div class="product-price">₹${prod.price !== undefined ? prod.price : '-'}</div>
         <div class="product-desc">${prod.description || ''}</div>
         <div><em>Category: ${prod.category || 'N/A'}</em></div>
-        <span class="stock-label" style="color:${isOutStock ? '#e91e63':'#158a00'};">
+      <div><em>Seller: ${prod.profiles?.name || 'N/A'}</em></div>
+      <span class="stock-label" style="color:${isOutStock ? '#e91e63':'#158a00'};">
           ${isOutStock ? 'Out of Stock' : ('In Stock: ' + prod.stock)}
         </span>
         <button class="add-cart-btn" ${addDisabled} onclick="addToCart('${prod.id}')">
@@ -228,11 +342,11 @@
   };
 
   async function loadCart() {
-    const { data, error } = await supabase
-      .from('cart')
-      .select('id, product_id, quantity, products(name, price, seller_id, stock)')
-      .eq('customer_id', customerId);
-    const container = document.getElementById('cart-list');
+   const { data, error } = await supabase
+  .from('cart')
+  .select('id, product_id, quantity, products(name, price, seller_id, stock, accept_cod)')
+  .eq('customer_id', customerId);
+ const container = document.getElementById('cart-list');
     if (error || !data.length) {
       container.innerHTML = '<div class="cart-empty">Your cart is empty.</div>';
       latestCart = [];
@@ -261,121 +375,379 @@
     loadCart();
   };
 
-  // Razorpay payment integration
-  window.startPayment = function() {
-    if (!latestCart.length || latestTotal === 0) {
-      alert('Cart is empty!');
-      return;
-    }
-    let options = {
-      key: "rzp_test_RWfoVf4VK0sQaK",
-      amount: latestTotal * 100,
-      currency: "INR",
-      name: "MyShop",
-      description: "Order Payment",
-      handler: function(response) {
-        placeOrder(latestCart, latestTotal, response.razorpay_payment_id);
-      },
-      prefill: {
-        email: "customer@domain.com",
-      },
-      theme: { color: "#0070f3" }
-    };
-    let rzp = new Razorpay(options);
-    rzp.open();
-  };
-
-  // Place order: and reduce stock
-  window.placeOrder = async function(cartItems, totalAmount, paymentId) {
-    try {
-      if (!cartItems.length) {
-        alert("Cart is empty!");
-        return;
-      }
-      // Insert order
-      const { data: order, error: orderError } = await supabase
-        .from("orders")
-        .insert([
-          { customer_id: customerId, total: totalAmount, payment_id: paymentId, status: "paid" },
-        ])
-        .select()
-        .single();
-      if (orderError || !order) {
-        alert("Order failed! " + (orderError?.message || ""));
-        return;
-      }
-      // Save items AND update inventory stocks
-      for (let item of cartItems) {
-        // Insert order item (with delivery status as pending)
-        await supabase.from("order_items").insert([
-          {
-            order_id: order.id,
-            product_id: item.product_id,
-            seller_id: item.products.seller_id,
-            quantity: item.quantity,
-            price: item.products.price,
-            status: 'pending'
-          },
-        ]);
-        // Reduce inventory stock (atomic)
-        const newStock = (item.products.stock || 0) - item.quantity;
-        if (newStock < 0) { continue; }
-        await supabase.from('products').update({stock: newStock}).eq('id', item.product_id);
-      }
-      await supabase.from("cart").delete().eq("customer_id", customerId);
-      alert("Order placed and payment successful!");
-      loadProducts(); // Also refresh visible product stocks
-      loadCart();
-      loadOrders();
-    } catch (err) {
-      alert("Order saving error: " + err.message);
-    }
-  };
-
-  async function loadOrders() {
-    const { data: orders, error } = await supabase
-      .from("orders")
-      .select("id, total, created_at, status, payment_id, order_items(product_id, quantity, price, status, products(name))")
-      .eq("customer_id", customerId)
-      .order("created_at", { ascending: false });
-    const container = document.getElementById("orders-list");
-    if (error || !orders.length) {
-      container.innerHTML = '<div class="order-empty">No orders yet.</div>';
-      return;
-    }
-    let html = "";
-    orders.forEach((order) => {
-      html += `<div style="margin-bottom:1.3rem;">
-        <strong>Order #${order.id}</strong>
-        <span style="color:#888;">(${order.created_at.slice(0, 19).replace("T", " ")})</span>
-        <span style="color:#e91e63;">Status: ${order.status}</span>
-        <span style="color:#15a100; margin-left:16px;">Payment ID: ${order.payment_id || '-'}</span>
-        <span style="color:#0070f3;float:right;">Total: ₹${order.total}</span><br>
-        <table><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th><th>Delivery Status</th></tr>`;
-      order.order_items.forEach((item) => {
-        let prodStatusClass = "prod-status-ind prod-status-pending";
-        if (item.status === "delivered") prodStatusClass = "prod-status-ind prod-status-delivered";
-        else if (item.status === "confirmed") prodStatusClass = "prod-status-ind prod-status-confirmed";
-        html += `<tr>
-          <td>${item.products.name}</td>
-          <td>${item.quantity}</td>
-          <td>₹${item.price}</td>
-          <td>₹${item.price * item.quantity}</td>
-          <td><span class="${prodStatusClass}">${item.status || 'pending'}</span></td>
-        </tr>`;
-      });
-      html += `</table></div>`;
-    });
-    container.innerHTML = html;
+ window.startPayment = function() {
+  if (!latestCart.length || latestTotal === 0) {
+    alert('Cart is empty!');
+    return;
   }
 
-  document.getElementById("profile-btn").onclick = function () {
+  let codAllowed = true;
+  for (let item of latestCart) {
+    if (!item.products.accept_cod) {
+      codAllowed = false;
+      break;
+    }
+  }
+
+  if (codAllowed) {
+    const useCOD = confirm('COD is available for your products. Click OK for Cash on Delivery, Cancel for Online Payment.');
+    if (useCOD) {
+      placeOrder(latestCart, latestTotal, null, 'cod');
+      return;
+    }
+  } else {
+    alert('COD is not available for some products in your cart. Please use Online Payment.');
+  }
+
+  let options = {
+    key: "rzp_test_RWfoVf4VK0sQaK",
+    amount: latestTotal * 100,
+    currency: "INR",
+    name: "MyShop",
+    description: "Order Payment",
+    handler: function(response) {
+      placeOrder(latestCart, latestTotal, response.razorpay_payment_id, 'online');
+    },
+    prefill: {
+      email: "customer@domain.com",
+    },
+    theme: { color: "#0070f3" }
+  };
+  let rzp = new Razorpay(options);
+  rzp.open();
+};
+    window.placeOrder = async function(cartItems, totalAmount, paymentId, paymentType='online') {
+      try {
+        if (!cartItems.length) {
+          alert("Cart is empty!");
+          return;
+        }
+        const orderStatus = paymentType === 'cod' ? 'pending' : 'paid';
+
+        const { data: order, error: orderError } = await supabase
+          .from("orders")
+          .insert([
+            { customer_id: customerId, total: totalAmount, payment_id: paymentId, status: orderStatus },
+          ])
+          .select()
+          .single();
+
+        if (orderError || !order) {
+          alert("Order failed! " + (orderError?.message || ""));
+          return;
+        }
+        for (let item of cartItems) {
+          await supabase.from("order_items").insert([
+            {
+              order_id: order.id,
+              product_id: item.product_id,
+              seller_id: item.products.seller_id,
+              quantity: item.quantity,
+              price: item.products.price,
+              status: 'pending'
+            }
+          ]);
+          const newStock = (item.products.stock || 0) - item.quantity;
+          if (newStock < 0) { continue; }
+          await supabase.from('products').update({ stock: newStock }).eq('id', item.product_id);
+        }
+        await supabase.from("cart").delete().eq("customer_id", customerId);
+        alert(`Order placed successfully! Payment method: ${paymentType === 'cod' ? 'Cash On Delivery' : 'Online Payment'}`);
+        loadProducts();
+        loadCart();
+        loadOrders();
+      } catch (err) {
+        alert("Order saving error: " + err.message);
+      }
+    };
+
+ async function loadOrders() {
+  const { data: orders, error } = await supabase
+    .from("orders")
+    .select(`
+      id,
+      total,
+      created_at,
+      status,
+      payment_id,
+      order_items(
+        product_id,
+        quantity,
+        price,
+        status,
+        products(name),
+        courier_name,
+        courier_tracking_number,
+        courier_tracking_url
+      )
+    `)
+    .eq("customer_id", customerId)
+    .order("created_at", { ascending: false });
+
+  const container = document.getElementById("orders-list");
+  if (error || !orders.length) {
+    container.innerHTML = '<div class="order-empty">No orders yet.</div>';
+    return;
+  }
+  let html = "";
+  orders.forEach(order => {
+    html += `<div style="margin-bottom:1.3rem;">
+      <strong>Order #${order.id}</strong>
+      <span style="color:#888;">(${order.created_at.slice(0, 19).replace("T", " ")})</span>
+      <span style="color:#e91e63;">Status: ${order.status}</span>
+      <span style="color:#15a100; margin-left:16px;">Payment ID: ${order.payment_id || '-'}</span>
+      <span style="color:#0070f3;float:right;">Total: ₹${order.total}</span><br>
+      <table>
+        <tr>
+          <th>Product</th>
+          <th>Qty</th>
+          <th>Unit Price</th>
+          <th>Subtotal</th>
+          <th>Delivery Status</th>
+          <th>Tracking</th>
+        </tr>`;
+    order.order_items.forEach(item => {
+      let trackingHtml = '-';
+      if (item.courier_tracking_number) {
+        if (item.courier_tracking_url) {
+          trackingHtml = `<div>${item.courier_name || ''}<br>
+            <a href="${item.courier_tracking_url}" target="_blank" rel="noopener noreferrer">
+              ${item.courier_tracking_number}</a></div>`;
+        } else {
+          trackingHtml = `<div>${item.courier_name || ''}<br>${item.courier_tracking_number}</div>`;
+        }
+      }
+      let prodStatusClass = "prod-status-ind prod-status-pending";
+      if(item.status === "delivered") prodStatusClass = "prod-status-ind prod-status-delivered";
+      else if(item.status === "confirmed") prodStatusClass = "prod-status-ind prod-status-confirmed";
+
+      html += `<tr>
+        <td>${item.products.name}</td>
+        <td>${item.quantity}</td>
+        <td>₹${item.price}</td>
+        <td>₹${item.price * item.quantity}</td>
+        <td><span class="${prodStatusClass}">${item.status || 'pending'}</span></td>
+        <td>${trackingHtml}</td>
+      </tr>`;
+    });
+    html += `</table></div>`;
+  });
+  container.innerHTML = html;
+}
+
+
+async function loadProducts() {
+  // This assumes products.seller_id references profiles.id
+  const { data, error } = await supabase
+    .from('products')
+    .select(`
+      id,
+      name,
+      description,
+      price,
+      stock,
+      category,
+      image_url,
+      accept_cod,
+      seller_id,
+      profiles(name)
+    `)
+    .order('id', { ascending: false });
+
+  if (error) {
+    alert("Failed to load products: " + error.message);
+    allProducts = [];
+    renderProducts();
+    return;
+  }
+  allProducts = data || [];
+  populateCategories();
+  populateSellers();
+  renderProducts();
+}
+
+ document.getElementById("profile-btn").onclick = function () {
     window.location.href = "profile.html";
   };
+
+  function openReturnModal() {
+    document.getElementById('returnModalBg').classList.add('active');
+    loadOrderItemsForReturn();
+  }
+  function closeReturnModal() {
+    document.getElementById('returnModalBg').classList.remove('active');
+    document.getElementById('return-msg').textContent = "";
+    document.getElementById('orderItemsBody').innerHTML = '';
+    document.getElementById('yourReturns').innerHTML = '';
+  }
+  document.getElementById('returns-btn').onclick = openReturnModal;
+  document.getElementById('returns-btn-orders').onclick = openReturnModal;
+
+  let selectedReturnItems = new Map();
+  function updateReturnSubmitButton() {
+    document.getElementById('submitReturnBtn').disabled = selectedReturnItems.size === 0;
+  }
+
+  async function loadOrderItemsForReturn() {
+    const msg = document.getElementById('return-msg');
+    msg.textContent = "Loading your recent order items...";
+    const orderItemsBody = document.getElementById("orderItemsBody");
+    selectedReturnItems.clear();
+    const sevenDaysAgoISO = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+    const {data: orders, error: ordersError} = await supabase
+      .from('orders')
+      .select('id, created_at')
+      .eq('customer_id', customerId)
+      .gte('created_at', sevenDaysAgoISO);
+
+    if (ordersError) {
+      msg.textContent = "Failed to load orders: " + ordersError.message;
+      msg.style.color = "red";
+      return;
+    }
+    const orderIds = orders ? orders.map(o => o.id) : [];
+
+    let orderItems = [];
+    if (orderIds.length) {
+      const { data: items, error: oiError } = await supabase
+        .from('order_items')
+        .select('id, order_id, quantity, returned, products(name), orders(created_at)')
+        .in('order_id', orderIds)
+        .or('returned.is.null,returned.eq.false')
+        .order('order_id', { ascending: false });
+      if (oiError) {
+        msg.textContent = "Failed to load order items: " + oiError.message;
+        msg.style.color = "red";
+        return;
+      }
+      orderItems = items;
+    }
+
+    if (!orderItems.length) {
+      orderItemsBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No eligible order items found.</td></tr>`;
+      msg.textContent = "";
+      updateReturnSubmitButton();
+      loadCustomerReturnsList();
+      return;
+    }
+
+    msg.textContent = "";
+    orderItemsBody.innerHTML = "";
+    orderItems.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="checkbox" data-item-id="${item.id}" /></td>
+        <td>${item.order_id}</td>
+        <td>${item.products.name}</td>
+        <td>${item.orders.created_at ? new Date(item.orders.created_at).toLocaleDateString() : ''}</td>
+        <td>${item.quantity}</td>
+        <td><textarea disabled placeholder="Enter reason for return"></textarea></td>
+      `;
+      orderItemsBody.appendChild(tr);
+
+      const checkbox = tr.querySelector('input[type="checkbox"]');
+      const textarea = tr.querySelector('textarea');
+
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          textarea.disabled = false;
+          selectedReturnItems.set(item.id, { id: item.id, quantity: item.quantity, reason: '' });
+        } else {
+          textarea.disabled = true;
+          textarea.value = '';
+          selectedReturnItems.delete(item.id);
+        }
+        updateReturnSubmitButton();
+      });
+
+      textarea.addEventListener('input', () => {
+        if (selectedReturnItems.has(item.id)) {
+          selectedReturnItems.get(item.id).reason = textarea.value.trim();
+        }
+      });
+    });
+    updateReturnSubmitButton();
+    loadCustomerReturnsList();
+  }
+
+  document.getElementById('returnForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const msg = document.getElementById('return-msg');
+    msg.textContent = "";
+    if (selectedReturnItems.size === 0) {
+      msg.textContent = "Select at least one item to return.";
+      msg.style.color = "red";
+      return;
+    }
+    for (const item of selectedReturnItems.values()) {
+      if (!item.reason || item.reason.length < 5) {
+        msg.textContent = "Please provide a reason of at least 5 characters for all selected items.";
+        msg.style.color = "red";
+        return;
+      }
+    }
+    try {
+      for (const item of selectedReturnItems.values()) {
+        let { error: insertError } = await supabase.from('returns').insert([{
+          order_item_id: item.id,
+          quantity: item.quantity,
+          reason: item.reason,
+          customer_id: customerId,
+          created_at: new Date().toISOString()
+        }]);
+        if (insertError) throw insertError;
+        await supabase.from('order_items').update({ returned: true }).eq('id', item.id);
+      }
+      msg.style.color = "green";
+      msg.textContent = "Return request submitted successfully.";
+      selectedReturnItems.clear();
+      updateReturnSubmitButton();
+      loadOrderItemsForReturn();
+      loadOrders();
+    } catch (err) {
+      msg.style.color = "red";
+      msg.textContent = "Failed to submit returns: " + err.message;
+    }
+  });
+
+  async function loadCustomerReturnsList() {
+    const returnsDiv = document.getElementById('yourReturns');
+    const { data, error } = await supabase
+      .from('returns')
+      .select(`created_at, reason, quantity, order_item_id, order_items(order_id, product_id, products(name), orders(customer_id)), customer_id`)
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+    if (error || !data.length) {
+      returnsDiv.innerHTML = `<div style="color:#888; font-size:0.98rem;">No past returns in last 10 entries.</div>`;
+      return;
+    }
+
+    let html = `<h3 style="margin-top:15px; font-size:1.11rem;">Your Recent Returns</h3><table style="font-size:0.98em; margin-top:8px;"><tr>
+        <th>Order</th>
+        <th>Product</th>
+        <th>Qty</th>
+        <th>Reason</th>
+        <th>Date</th>
+    </tr>`;
+    for (const r of data) {
+      html += `<tr>
+        <td>${r.order_items ? r.order_items.order_id : ''}</td>
+        <td>${r.order_items && r.order_items.products ? r.order_items.products.name : ''}</td>
+        <td>${r.quantity}</td>
+        <td>${r.reason}</td>
+        <td>${new Date(r.created_at).toLocaleDateString()}</td>
+      </tr>`;
+    }
+    html += `</table>`;
+    returnsDiv.innerHTML = html;
+  }
+
   document.getElementById("logout-btn").onclick = async () => {
     await supabase.auth.signOut();
     window.location.href = "login.html";
   };
+
   checkLogin();
 </script>
 </body>

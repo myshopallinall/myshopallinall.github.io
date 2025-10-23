@@ -6,37 +6,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 2rem; background: #f4f8fc; }
-    h1 { color: #0070f3; margin-bottom: 1.5rem; }
-    #status-message {
-      display: none;
-      padding: 12px 18px;
-      margin-bottom: 18px;
-      background: #e3fbe3;
-      color: #066306;
-      border-radius: 6px;
-      font-weight: bold;
-      letter-spacing: 0.5px;
-      box-shadow: 0 1px 5px #c0f6ca;
-      text-align: center;
-    }
-    table { width: 100%; border-collapse: collapse; box-shadow: 0 1px 6px #ccc; background: white; }
-    th, td { padding: 10px; border: 1px solid #ddd; text-align: left; }
-    th { background: #eef5ff; }
-    button { padding: 6px 14px; margin-right: 6px; border: none; border-radius: 5px; color: white; cursor: pointer; }
-    .btn-confirm { background: #27ae60; }
-    .btn-deliver { background: #3498db; }
-    .btn-invoice { background: #e67e22; }
-    .btn-delivery-info { background: #9b59b6; }
-    .btn-prod-delivered { background: #15a100; margin-left:2px; }
-    .delivered-status { color: #27ae60; font-weight: bold; }
-    .paid-status { color: #005bb5; font-weight: bold; }
-    .modal {
-      display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%);
-      background:white; padding:20px; border-radius:8px; box-shadow:0 0 15px rgba(0,0,0,0.3);
-      max-width:600px; max-height:80vh; overflow:auto; z-index:100;
-    }
-    .modal-header { font-weight:bold; font-size:20px; margin-bottom:10px; }
-    .modal-close { float:right; background:none; border:none; font-size:22px; cursor:pointer; }
+    h1 { color: #0070f3; margin-bottom: 1.5rem;}
+    #status-message { display: none; padding: 12px 18px; margin-bottom: 18px; background: #e3fbe3; color: #066306; border-radius: 6px; font-weight: bold; letter-spacing: 0.5px; box-shadow: 0 1px 5px #c0f6ca; text-align: center;}
+    table { width: 100%; border-collapse: collapse; box-shadow: 0 1px 6px #ccc; background: white;}
+    th, td { padding: 10px; border: 1px solid #ddd; text-align: left;}
+    th { background: #eef5ff;}
+    button { padding: 6px 14px; margin-right: 6px; border: none; border-radius: 5px; color: white; cursor: pointer;}
+    .btn-confirm { background: #27ae60;}
+    .btn-deliver { background: #3498db;}
+    .btn-invoice { background: #e67e22;}
+    .btn-delivery-info { background: #9b59b6;}
+    .btn-prod-delivered { background: #15a100; margin-left:2px;}
+    .btn-tracking { background: #2c3e50;}
+    .delivered-status { color: #27ae60; font-weight: bold;}
+    .paid-status { color: #005bb5; font-weight: bold;}
+    .modal { display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%); background:white; padding:20px; border-radius:8px; box-shadow:0 0 15px rgba(0,0,0,0.3); max-width:600px; max-height:80vh; overflow:auto; z-index:100;}
+    .modal-header { font-weight:bold; font-size:20px; margin-bottom:10px;}
+    .modal-close { float:right; background:none; border:none; font-size:22px; cursor:pointer;}
     .modal-print { float:right; margin-right:10px; background:#3498db; color:#fff; border:none; border-radius:5px; font-size:15px; padding:5px 14px; cursor:pointer; }
     .modal-content { clear:both; margin-top:8px;}
     .modal-extra-close { display:block; margin:20px auto 0 auto; background:#e67e22; color:#fff; border:none; border-radius:5px; font-size:16px; padding:7px 38px; cursor:pointer;}
@@ -44,6 +30,7 @@
     .prod-status-pending{background:#ffe600;color:#222;}
     .prod-status-confirmed{background:#3498db;color:#fff;}
     .prod-status-delivered{background:#27ae60;color:#fff;}
+    .tracking-link {color:#0070f3;text-decoration:underline;word-break:break-all;display:inline-block;}
   </style>
 </head>
 <body>
@@ -63,11 +50,14 @@
   <tbody></tbody>
 </table>
 
+<!-- Delivery Modal -->
 <div id="delivery-modal" class="modal">
   <button id="close-delivery" class="modal-close">×</button>
   <div class="modal-header">Delivery Details</div>
   <div class="modal-content" id="delivery-html"></div>
 </div>
+
+<!-- Invoice Modal -->
 <div id="invoice-modal" class="modal">
   <button id="close-invoice" class="modal-close">×</button>
   <button id="print-invoice" class="modal-print">Print</button>
@@ -76,11 +66,34 @@
   <button id="modal-extra-close-btn" class="modal-extra-close">Close</button>
 </div>
 
+<!-- Tracking Modal -->
+<div id="tracking-modal" class="modal">
+  <button id="close-tracking" class="modal-close">×</button>
+  <div class="modal-header">Add/Update Courier Tracking</div>
+  <form id="tracking-form">
+    <div>
+      <label>Courier Name:<br>
+        <input type="text" id="courier-name" required style="width:95%;"></label>
+    </div>
+    <div>
+      <label>Tracking Number:<br>
+        <input type="text" id="tracking-number" required style="width:95%;"></label>
+    </div>
+    <div>
+      <label>Tracking Link/Website:<br>
+        <input type="url" id="tracking-url" placeholder="https://..." style="width:95%;"></label>
+    </div>
+    <div style="margin-top:10px;">
+      <button type="submit" class="btn-tracking">Save Tracking</button>
+    </div>
+  </form>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const supabase = window.supabase.createClient(
     'https://wamqheltqmufuzrqlxlb.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+ 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
   );
 
   function showStatusMessage(msg, colorBg='#e3fbe3', colorText='#066306') {
@@ -89,12 +102,12 @@
     div.style.display = 'block';
     div.style.background = colorBg;
     div.style.color = colorText;
-    setTimeout(() => { div.style.display = 'none'; }, 2500);
+    setTimeout(() => { div.style.display = 'none'; }, 3000);
   }
 
   let currentUser = null;
+  let currentTrackingOrderItemId = null;
 
-  // --- Load all seller orders ---
   async function loadSellerOrders() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -119,8 +132,11 @@
           price,
           hsn_code,
           status,
+          courier_name,
+          courier_tracking_number,
+          courier_tracking_url,
           products(name, seller_id),
-          profiles_seller: seller_id (id, name, address, email, gst_number, pan_number, phone)
+          profiles_seller: seller_id(id, name, address, email, gst_number, pan_number, phone)
         )
       `)
       .order('created_at', { ascending: false });
@@ -130,7 +146,7 @@
       return;
     }
 
-    // Only show orders with at least one item for the seller
+    // Only show orders with items for current seller
     const sellerOrders = orders.filter(order =>
       order.order_items.some(item =>
         item.profiles_seller && item.profiles_seller.id === user.id
@@ -139,7 +155,6 @@
     const tbody = document.querySelector('#orders-table tbody');
     tbody.innerHTML = '';
     sellerOrders.forEach(order => {
-      // HSN code only from seller's items
       const itemCodes = order.order_items.filter(
         item => item.profiles_seller && item.profiles_seller.id === user.id
       ).map(item => item.hsn_code || '-').join(', ');
@@ -147,12 +162,10 @@
       tr.innerHTML = `
         <td>${order.id}</td>
         <td>${order.profiles.name}</td>
-        <td>
-          ${order.status === 'delivered'
-            ? '<span class="delivered-status">Delivered & Paid</span>'
-            : order.status
-          }
-        </td>
+        <td>${order.status === 'delivered'
+          ? '<span class="delivered-status">Delivered & Paid</span>'
+          : order.status
+        }</td>
         <td>${new Date(order.created_at).toLocaleString()}</td>
         <td>${itemCodes}</td>
         <td></td>
@@ -207,7 +220,8 @@
             <th>Unit Price</th>
             <th>Total</th>
             <th>Product Status</th>
-            <th>Action</th>
+            <th>Tracking Info</th>
+            <th>Tracking Action</th>
           </tr>
         </thead>
         <tbody>
@@ -216,6 +230,15 @@
       let prodStatusClass = "prod-status-ind prod-status-pending";
       if (item.status === "delivered") prodStatusClass = "prod-status-ind prod-status-delivered";
       else if (item.status === "confirmed") prodStatusClass = "prod-status-ind prod-status-confirmed";
+
+      let trackingHtml = '-';
+      if (item.courier_tracking_number) {
+        let trackingLink = item.courier_tracking_url ?
+          `<a href="${item.courier_tracking_url}" target="_blank" rel="noopener" class="tracking-link">${item.courier_tracking_number}</a>`
+          : item.courier_tracking_number;
+        trackingHtml = `${item.courier_name || ''}<br>${trackingLink}`;
+      }
+
       html += `<tr>
         <td>${item.products.name}</td>
         <td>${item.hsn_code || '-'}</td>
@@ -223,11 +246,10 @@
         <td>₹${item.price}</td>
         <td>₹${item.price * item.quantity}</td>
         <td><span class="${prodStatusClass}">${item.status || 'pending'}</span></td>
+        <td>${trackingHtml}</td>
         <td>
-          ${item.status !== 'delivered' ?
-            `<button class="btn-prod-delivered" onclick="markProductDelivered(${item.id})">Mark Delivered</button>`
-            : `<span class="delivered-status">Delivered</span>`
-          }
+          <button class="btn-tracking" onclick="openTrackingModal(${item.id}, '${item.courier_name || ''}', '${item.courier_tracking_number || ''}', '${item.courier_tracking_url || ''}')">Add/Update</button>
+          ${item.status !== 'delivered' ? `<button class="btn-prod-delivered" onclick="markProductDelivered(${item.id})">Mark Delivered</button>` : '<span class="delivered-status">Delivered</span>'}
         </td>
       </tr>`;
     });
@@ -249,6 +271,43 @@
     }
   };
 
+  // Open Tracking Modal and prefill
+  function openTrackingModal(orderItemId, courierName, trackingNumber, trackingUrl) {
+    currentTrackingOrderItemId = orderItemId;
+    document.getElementById('courier-name').value = courierName;
+    document.getElementById('tracking-number').value = trackingNumber;
+    document.getElementById('tracking-url').value = trackingUrl;
+    document.getElementById('tracking-modal').style.display = 'block';
+  }
+
+  // Save Tracking Info to database
+  document.getElementById('tracking-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!currentTrackingOrderItemId) return;
+
+    const courierName = document.getElementById('courier-name').value;
+    const trackingNumber = document.getElementById('tracking-number').value;
+    const trackingUrl = document.getElementById('tracking-url').value;
+
+    const { error } = await supabase.from('order_items').update({
+      courier_name: courierName,
+      courier_tracking_number: trackingNumber,
+      courier_tracking_url: trackingUrl,
+    }).eq('id', currentTrackingOrderItemId);
+
+    if (error) {
+      showStatusMessage('Failed to save tracking info: ' + error.message, '#ffeded', '#a10021');
+    } else {
+      showStatusMessage('Tracking info saved.');
+      loadSellerOrders();
+      document.getElementById('tracking-modal').style.display = 'none';
+    }
+  });
+
+  function closeTracking() {
+    document.getElementById('tracking-modal').style.display = 'none';
+  }
+
   async function showInvoice(orderId, sellerId) {
     const { data: order, error } = await supabase.from('orders')
       .select(`
@@ -262,6 +321,9 @@
           price,
           hsn_code,
           status,
+          courier_name,
+          courier_tracking_number,
+          courier_tracking_url,
           products(name, seller_id),
           profiles_seller: seller_id(id, name, address, email, gst_number, pan_number, phone)
         )
@@ -274,9 +336,11 @@
       return;
     }
 
+    // Filter to seller's items
     const filteredItems = order.order_items.filter(
       item => item.profiles_seller && item.profiles_seller.id === sellerId
     );
+
     let sellerInfo = filteredItems[0]?.profiles_seller || {};
     let statusDisplay = '';
     if (order.status === 'delivered') {
@@ -306,7 +370,7 @@
       <hr>
       <table border="1" cellpadding="4" cellspacing="0" width="100%">
         <thead>
-          <tr><th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Product Status</th></tr>
+          <tr><th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Product Status</th><th>Tracking Info</th></tr>
         </thead>
         <tbody>
     `;
@@ -314,6 +378,15 @@
       let prodStatusClass = "prod-status-ind prod-status-pending";
       if (item.status === "delivered") prodStatusClass = "prod-status-ind prod-status-delivered";
       else if (item.status === "confirmed") prodStatusClass = "prod-status-ind prod-status-confirmed";
+
+      let trackingHtml = '-';
+      if (item.courier_tracking_number) {
+        let trackingLink = item.courier_tracking_url ?
+          `<a href="${item.courier_tracking_url}" target="_blank" rel="noopener" class="tracking-link">${item.courier_tracking_number}</a>`
+          : item.courier_tracking_number;
+        trackingHtml = `${item.courier_name || ''}<br>${trackingLink}`;
+      }
+
       html += `<tr>
         <td>${item.products.name}</td>
         <td>${item.hsn_code || '-'}</td>
@@ -321,6 +394,7 @@
         <td>₹${item.price}</td>
         <td>₹${item.price * item.quantity}</td>
         <td><span class="${prodStatusClass}">${item.status || 'pending'}</span></td>
+        <td>${trackingHtml}</td>
       </tr>`;
     });
     const total = filteredItems.reduce((sum, i) => sum + (i.quantity * i.price), 0);
@@ -353,6 +427,7 @@
   document.getElementById('modal-extra-close-btn').onclick = closeInvoice;
   document.getElementById('print-invoice').onclick = printInvoice;
   document.getElementById('close-delivery').onclick = closeDelivery;
+  document.getElementById('close-tracking').onclick = closeTracking;
 
   window.onload = loadSellerOrders;
 </script>

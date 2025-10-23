@@ -8,7 +8,9 @@
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f9f9f9; margin: 0; padding: 2rem; }
     h1, h2 { color: #0070f3; }
     form { background: white; border-radius: 6px; padding: 1rem; margin-bottom: 2rem; max-width: 480px; box-shadow: 0 3px 8px rgba(0,0,0,0.07); }
-    form input, form textarea { width: 100%; margin: 0.6rem 0; padding: 0.5rem; font-size: 1rem; border: 1.5px solid #ddd; border-radius: 4px; }
+    form input, form textarea, form select { width: 100%; margin: 0.6rem 0; padding: 0.5rem; font-size: 1rem; border: 1.5px solid #ddd; border-radius: 4px; }
+    form label.option-label { font-size: 1.05rem; padding: 0 0.25rem 0 0; display:inline-block;}
+    form .checkbox-row { display: flex; gap: 24px; align-items: center; margin: 0.6rem 0;}
     form button { background: #0070f3; border: none; padding: 0.7rem 1.2rem; color: white; font-size: 1rem; border-radius: 4px; cursor: pointer; margin-top: 1rem; }
     form button:hover { background: #005bb5; }
     #products-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 1rem; }
@@ -29,7 +31,13 @@
     .stock-label { font-weight:bold; margin-top:0.42rem; display:inline-block; padding: 2px 7px; border-radius: 8px;}
     .in-stock { background: #e6ffe4; color: #158a00;}
     .out-stock { background: #ffebeb; color: #c0392b;}
-    .stock-edit-label {font-size:0.97rem;padding:0 3px;}
+    .option-tag { font-size: 0.92rem; padding: 2px 8px; border-radius: 10px; background: #f8fafe; display: inline-block; margin:3px; }
+    .cod-yes { color: #158a00; background: #d7ffe7;}
+    .online-yes { color: #0070f3; background: #d7f2ff;}
+    .cod-no, .online-no { color: #b10; background: #ffeaea; }
+    #returns-list table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    #returns-list th, #returns-list td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    #returns-list th { background-color: #0070f3; color: white; }
   </style>
 </head>
 <body>
@@ -51,6 +59,10 @@
   <input type="number" id="prod-stock" placeholder="Stock (Qty)" min="0" required />
   <textarea id="prod-desc" placeholder="Description"></textarea>
   <input type="file" id="prod-image-file" accept="image/*" />
+  <div class="checkbox-row" style="margin:0.8rem 0;">
+    <label class="option-label"><input type="checkbox" id="accept-cod" checked /> Accept COD</label>
+    <label class="option-label"><input type="checkbox" id="accept-online" checked /> Accept Online Payment</label>
+  </div>
   <button type="submit">Add Product</button>
   <button type="button" id="cancel-edit-btn" class="cancel-edit-btn" style="display:none;">Cancel Edit</button>
 </form>
@@ -58,13 +70,15 @@
 <h2>Your Products</h2>
 <div id="products-list"></div>
 
+<h2>Return Requests</h2>
+<div id="returns-list"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const supabase = window.supabase.createClient(
     'https://wamqheltqmufuzrqlxlb.supabase.co',
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
   );
-
   let sellerId = null;
 
   async function getUser() {
@@ -73,13 +87,13 @@
       sellerId = data.user.id;
       await checkSellerDetails();
       loadSellerProducts();
+      loadSellerReturns();
     } else {
       alert('Please log in first!');
       window.location.href = 'login.html';
     }
   }
 
-  // Require GST and PAN numbers before allowing add product
   async function checkSellerDetails() {
     const { data, error } = await supabase.from('profiles').select('gst_number, pan_number').eq('id', sellerId).single();
     if (error || !data) {
@@ -98,7 +112,6 @@
     let { error: uploadError } = await supabase.storage
       .from('product-images')
       .upload(fileName, file);
-
     if (uploadError) {
       alert('Image upload failed: ' + uploadError.message);
       return null;
@@ -109,7 +122,6 @@
     return urlData.publicUrl;
   }
 
-  // Handle Add / Edit product
   document.getElementById('product-form').onsubmit = async function(e) {
     e.preventDefault();
     const prodId = document.getElementById('prod-id').value || null;
@@ -120,12 +132,12 @@
     const stock = parseInt(document.getElementById('prod-stock').value, 10);
     const description = document.getElementById('prod-desc').value;
     const fileInput = document.getElementById('prod-image-file');
+    const accept_cod = document.getElementById('accept-cod').checked;
+    const accept_online_payment = document.getElementById('accept-online').checked;
     let image_url = '';
-
     if (fileInput.files.length > 0) {
       image_url = await uploadImage(fileInput.files[0]);
     }
-
     let productData = {
       seller_id: sellerId,
       name,
@@ -133,10 +145,11 @@
       hsn_code,
       price,
       stock,
-      description
+      description,
+      accept_cod,
+      accept_online_payment
     };
     if (image_url) productData.image_url = image_url;
-
     if (prodId) {
       const { error } = await supabase.from('products')
         .update(productData)
@@ -165,6 +178,8 @@
     document.getElementById('prod-id').value = '';
     document.getElementById('cancel-edit-btn').style.display = 'none';
     document.querySelector("#product-form button[type=submit]").textContent = "Add Product";
+    document.getElementById('accept-cod').checked = true;
+    document.getElementById('accept-online').checked = true;
   }
 
   async function loadSellerProducts() {
@@ -176,6 +191,8 @@
     const container = document.getElementById('products-list');
     container.innerHTML = '';
     data.forEach(prod => {
+      const cod = prod.accept_cod ? '<span class="option-tag cod-yes">COD</span>' : '<span class="option-tag cod-no">No COD</span>';
+      const online = prod.accept_online_payment ? '<span class="option-tag online-yes">Online</span>' : '<span class="option-tag online-no">No Online</span>';
       const div = document.createElement('div');
       div.className = 'product-card';
       div.innerHTML = `
@@ -190,6 +207,7 @@
             ${prod.stock > 0 ? 'In Stock (' + prod.stock + ')':'Out of Stock'}
           </span>
         </div>
+        <div style="margin-top:6px;">${cod} ${online}</div>
         <button class="edit-btn" onclick="editProduct('${prod.id}')">Edit</button>
         <button class="delete-btn" onclick="deleteProduct('${prod.id}')">Delete</button>
       `;
@@ -212,6 +230,8 @@
     document.getElementById('prod-desc').value = prod.description || "";
     document.getElementById('cancel-edit-btn').style.display = "inline-block";
     document.querySelector("#product-form button[type=submit]").textContent = "Update Product";
+    document.getElementById('accept-cod').checked = Boolean(prod.accept_cod);
+    document.getElementById('accept-online').checked = Boolean(prod.accept_online_payment);
   };
 
   window.deleteProduct = async function(prodId) {
@@ -231,6 +251,70 @@
   document.getElementById('logout-btn').onclick = async () => {
     await supabase.auth.signOut();
     window.location.href = 'login.html';
+  }
+
+  // Return Requests Section
+  async function loadSellerReturns() {
+    if (!sellerId) return;
+    // Get all return requests for this seller's products (with customer info as separate lookup)
+    const { data: returns, error } = await supabase
+      .from('returns')
+      .select('id,quantity,reason,created_at,order_item_id')
+      .order('created_at', { ascending: false });
+    if (error) {
+      document.getElementById('returns-list').textContent = 'Error loading returns: ' + error.message;
+      return;
+    }
+
+    let html = `<table>
+        <thead>
+          <tr>
+            <th>Return ID</th>
+            <th>Product</th>
+            <th>Quantity</th>
+            <th>Reason</th>
+            <th>Customer Email</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    for (const r of returns) {
+      const { data: oi } = await supabase
+        .from('order_items')
+        .select('product_id,seller_id,order_id')
+        .eq('id', r.order_item_id)
+        .maybeSingle();
+      if (!oi || oi.seller_id !== sellerId) continue;
+      const { data: prod } = await supabase
+        .from('products')
+        .select('name')
+        .eq('id', oi.product_id)
+        .maybeSingle();
+      const { data: order } = await supabase
+        .from('orders')
+        .select('customer_id')
+        .eq('id', oi.order_id)
+        .maybeSingle();
+      let customerEmail = '';
+      if (order && order.customer_id) {
+        const { data: user } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', order.customer_id)
+          .maybeSingle();
+        customerEmail = (user && user.email) || '(Unknown)';
+      }
+      html += `<tr>
+        <td>${r.id}</td>
+        <td>${prod ? prod.name : 'Unknown'}</td>
+        <td>${r.quantity}</td>
+        <td>${r.reason}</td>
+        <td>${customerEmail}</td>
+        <td>${new Date(r.created_at).toLocaleDateString()}</td>
+      </tr>`;
+    }
+    html += `</tbody></table>`;
+    document.getElementById('returns-list').innerHTML = html;
   }
 
   getUser();

@@ -230,7 +230,7 @@
   async function loadCart() {
     const { data, error } = await supabase
       .from('cart')
-      .select('id, product_id, quantity, products(name, price, seller_id)')
+      .select('id, product_id, quantity, products(name, price, seller_id, stock)')
       .eq('customer_id', customerId);
     const container = document.getElementById('cart-list');
     if (error || !data.length) {
@@ -267,10 +267,9 @@
       alert('Cart is empty!');
       return;
     }
-    // Prefill customer details, change email if you fetch it from profile table
     let options = {
-      key: "rzp_test_RWfoVf4VK0sQaK", // or your live key for production
-      amount: latestTotal * 100, // Amount must be in paise
+      key: "rzp_test_RWfoVf4VK0sQaK",
+      amount: latestTotal * 100,
       currency: "INR",
       name: "MyShop",
       description: "Order Payment",
@@ -278,7 +277,7 @@
         placeOrder(latestCart, latestTotal, response.razorpay_payment_id);
       },
       prefill: {
-        email: "customer@domain.com", // Optionally update with logged-in user email
+        email: "customer@domain.com",
       },
       theme: { color: "#0070f3" }
     };
@@ -286,6 +285,7 @@
     rzp.open();
   };
 
+  // Place order: and reduce stock
   window.placeOrder = async function(cartItems, totalAmount, paymentId) {
     try {
       if (!cartItems.length) {
@@ -304,8 +304,9 @@
         alert("Order failed! " + (orderError?.message || ""));
         return;
       }
-      // Save order items
+      // Save items AND update inventory stocks
       for (let item of cartItems) {
+        // Insert order item (with delivery status as pending)
         await supabase.from("order_items").insert([
           {
             order_id: order.id,
@@ -316,9 +317,14 @@
             status: 'pending'
           },
         ]);
+        // Reduce inventory stock (atomic)
+        const newStock = (item.products.stock || 0) - item.quantity;
+        if (newStock < 0) { continue; }
+        await supabase.from('products').update({stock: newStock}).eq('id', item.product_id);
       }
       await supabase.from("cart").delete().eq("customer_id", customerId);
       alert("Order placed and payment successful!");
+      loadProducts(); // Also refresh visible product stocks
       loadCart();
       loadOrders();
     } catch (err) {

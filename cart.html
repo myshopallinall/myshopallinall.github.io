@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Your Cart - MyShop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Montserrat', Arial, sans-serif;
+      background-color: #f3f4f6;
+      margin: 0;
+      padding-bottom: 60px;
+    }
+    .header {
+      background: linear-gradient(90deg, #232f3e 70%, #0070f3 100%);
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0, 112, 243, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header h1 {
+      font-size: 2.2rem;
+      margin: 0;
+      letter-spacing: 1px;
+      font-weight: 700;
+    }
+    .nav-group button {
+      background: transparent;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      margin-left: 18px;
+      padding: 6px 10px;
+      border-radius: 5px;
+      transition: background 0.3s;
+    }
+    .nav-group button:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+    main {
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #111827;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid #0070f3;
+      padding-bottom: 8px;
+    }
+    .cart-container {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.07);
+      padding: 1.5rem 2rem;
+      transition: 0.3s;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.98rem;
+    }
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+    }
+    th {
+      background-color: #f9fafb;
+      color: #1f2937;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.9rem;
+    }
+    tr:hover td {
+      background-color: #f9fafc;
+    }
+    .cart-empty {
+      text-align: center;
+      font-size: 1.1rem;
+      padding: 2rem;
+      color: #888;
+    }
+    .remove-btn {
+      background: #e11d48;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background 0.3s;
+      font-weight: 600;
+    }
+    .remove-btn:hover {
+      background: #b91c1c;
+    }
+    .summary {
+      margin-top: 1.6rem;
+      text-align: right;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #111827;
+    }
+    .total-box {
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: #0070f3;
+      color: #fff;
+      display: inline-block;
+      padding: 10px 18px;
+      border-radius: 6px;
+      margin-bottom: 15px;
+    }
+    .place-order-btn {
+      background: linear-gradient(90deg, #e91e63 0%, #f43f5e 100%);
+      color: white;
+      font-weight: 700;
+      font-size: 1.1rem;
+      padding: 12px 34px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.3s;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+    }
+    .place-order-btn:hover {
+      background: linear-gradient(90deg, #ff4081 0%, #ff1744 100%);
+      box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+    }
+    @media (max-width: 700px) {
+      table, th, td {
+        font-size: 0.85rem;
+      }
+      h2 {
+        font-size: 1.5rem;
+      }
+      .total-box, .place-order-btn { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="header">
+  <h1>MyShop</h1>
+  <div class="nav-group">
+    <button onclick="window.location.href='custdashboard.html'">Home</button>
+    <button onclick="window.location.href='order.html'">Your Orders</button>
+    <button onclick="logout()">Logout</button>
+  </div>
+</div>
+<main>
+  <h2>Your Cart</h2>
+  <div id="cart-list" class="cart-container"></div>
+  <div class="summary">
+    <div id="total-section" style="display:none;">
+      <div class="total-box">Total: ₹<span id="cart-total">0</span></div><br/>
+      <button class="place-order-btn" onclick="startPayment()">Proceed to Pay</button>
+    </div>
+  </div>
+</main>
+
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  let customerId = null, latestCart = [], latestTotal = 0;
+
+  checkLogin();
+  async function checkLogin(){
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      alert('Please login first!');
+      window.location.href = 'login.html';
+      return;
+    }
+    customerId = data.user.id;
+    loadCart();
+  }
+
+  async function loadCart(){
+    const { data, error } = await supabase.from('cart')
+      .select('id, product_id, quantity, products(name, price, seller_id, stock, accept_cod)')
+      .eq('customer_id', customerId);
+
+    const container = document.getElementById('cart-list');
+    const totalSection = document.getElementById('total-section');
+    if (error || !data || !data.length) {
+      container.innerHTML = '<div class="cart-empty">Your cart is empty — add some items!</div>';
+      totalSection.style.display = 'none';
+      return;
+    }
+
+    let html = `<table><thead><tr>
+      <th>Product</th><th>Price</th><th>Qty</th><th>Total</th><th>Remove</th>
+    </tr></thead><tbody>`;
+    data.forEach(item => {
+      html += `<tr>
+        <td>${item.products?.name ?? '-'}</td>
+        <td>₹${item.products?.price ?? '-'}</td>
+        <td>${item.quantity}</td>
+        <td>₹${(item.products?.price ?? 0) * item.quantity}</td>
+        <td><button class="remove-btn" onclick="removeFromCart('${item.id}')">Remove</button></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    container.innerHTML = html;
+
+    latestCart = data;
+    latestTotal = data.reduce((sum, i) => sum + (i.products?.price ?? 0) * i.quantity, 0);
+    document.getElementById("cart-total").innerText = latestTotal.toFixed(2);
+    totalSection.style.display = 'block';
+  }
+
+  window.removeFromCart = async function(cartId){
+    await supabase.from('cart').delete().eq('id', cartId);
+    loadCart();
+  };
+
+  window.startPayment = function(){
+    if (!latestCart.length || latestTotal === 0) return alert('Your cart is empty.');
+
+    let codAllowed = latestCart.every(i => i.products.accept_cod);
+    if (codAllowed) {
+      if (confirm('COD available. Press OK for Cash on Delivery or Cancel for Online Payment.')) {
+        placeOrder(latestCart, latestTotal, null, 'cod');
+        return;
+      }
+    } else {
+      alert('COD not available for some items. Online payment only.');
+    }
+
+    const options = {
+      key: 'rzp_test_RWfoVf4VK0sQaK',
+      amount: latestTotal * 100,
+      currency: 'INR',
+      name: 'MyShop',
+      description: 'Order Payment',
+      handler: response => {
+        placeOrder(latestCart, latestTotal, response.razorpay_payment_id, 'online');
+      },
+      theme: { color: '#0070f3' }
+    };
+    let rzp = new Razorpay(options);
+    rzp.open();
+  };
+
+  async function placeOrder(cartItems, totalAmount, paymentId, paymentType) {
+    try {
+      const orderStatus = paymentType === 'cod' ? 'pending' : 'paid';
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert([{ customer_id: customerId, total: totalAmount, payment_id: paymentId, status: orderStatus }])
+        .select()
+        .single();
+      if (orderError) throw new Error(orderError.message);
+      for (let i of cartItems) {
+        await supabase.from('order_items').insert([{
+          order_id: order.id,
+          product_id: i.product_id,
+          seller_id: i.products.seller_id,
+          quantity: i.quantity,
+          price: i.products.price,
+          status: 'pending'
+        }]);
+        const newStock = (i.products.stock || 0) - i.quantity;
+        if (newStock >= 0)
+          await supabase.from('products').update({ stock: newStock }).eq('id', i.product_id);
+      }
+      await supabase.from('cart').delete().eq('customer_id', customerId);
+      alert(`Order placed successfully (${paymentType === 'cod' ? 'COD' : 'Online Payment'})`);
+      loadCart();
+    } catch (err) {
+      alert('Order Error: ' + err.message);
+    }
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+    window.location.href = 'login.html';
+  }
+</script>
+</body>
+</html>

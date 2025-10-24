@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Reset Password</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:#f2f5fa; display:flex;align-items:center;justify-content:center;height:100vh;margin:0; }
+    #reset-form { background:white; padding:2rem; border-radius:10px; box-shadow:0 6px 15px rgba(0,0,0,0.1); width:340px; }
+    #reset-form h2 { color:#0070f3; margin-bottom:1rem; }
+    input, button { width:100%; padding:0.8rem; margin:0.7rem 0; border-radius:6px; border:1.5px solid #ddd; font-size:1rem; }
+    button { background-color:#0070f3; color:#fff; font-weight:bold; border:none; cursor:pointer; }
+    button:hover { background-color:#005bb5; }
+    .success { color:#27ae60; font-weight:bold; }
+    .error { color:#e74c3c; font-weight:bold; }
+  </style>
+</head>
+<body>
+<form id="reset-form">
+  <h2>Set New Password</h2>
+  <input type="password" id="new-password" placeholder="New password" required />
+  <button type="submit">Reset Password</button>
+  <div id="reset-message"></div>
+</form>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // Use your actual Supabase values (same as for login.html)
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  // Show the form, listen for submission
+  document.getElementById('reset-form').onsubmit = async function(e) {
+    e.preventDefault();
+    const newPassword = document.getElementById('new-password').value;
+    const msg = document.getElementById('reset-message');
+    msg.textContent = "Updating password...";
+    msg.className = "";
+    try {
+      // Wait for Supabase to be in PASSWORD_RECOVERY mode
+      supabase.auth.onAuthStateChange(async (event) => {
+        if (event === "PASSWORD_RECOVERY") {
+          const { error } = await supabase.auth.updateUser({ password: newPassword });
+          if (error) {
+            msg.textContent = "Error: " + error.message;
+            msg.className = "error";
+          } else {
+            msg.textContent = "Password updated! You can now log in with your new password.";
+            msg.className = "success";
+          }
+        }
+      });
+    } catch (err) {
+      msg.textContent = "Error: " + err.message;
+      msg.className = "error";
+    }
+  };
+</script>
+</body>
+</html>

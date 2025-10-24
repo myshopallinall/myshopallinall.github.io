@@ -11,26 +11,46 @@
     table { width: 100%; border-collapse: collapse; box-shadow: 0 1px 6px #ccc; background: white;}
     th, td { padding: 10px; border: 1px solid #ddd; text-align: left;}
     th { background: #eef5ff;}
-    button { padding: 6px 14px; margin-right: 6px; border: none; border-radius: 5px; color: white; cursor: pointer;}
-    .btn-confirm { background: #27ae60;}
-    .btn-deliver { background: #3498db;}
-    .btn-invoice { background: #e67e22;}
-    .btn-delivery-info { background: #9b59b6;}
-    .btn-prod-delivered { background: #15a100; margin-left:2px;}
-    .btn-tracking { background: #2c3e50;}
-    .delivered-status { color: #27ae60; font-weight: bold;}
-    .paid-status { color: #005bb5; font-weight: bold;}
+    button { padding: 6px 13px; margin: 2px 2px 2px 0; border: none; border-radius: 5px; color: white; cursor: pointer;}
+    .btn-confirm { background: #3498db;}
+    .btn-placed { background: #6c63ff;}
+    .btn-shipped { background: #8546d5;}
+    .btn-couriered { background: #b24d98;}
+    .btn-dispatched { background: #2bc26b;}
+    .btn-delivered { background: #219f43;}
+    .btn-invoice { background: #f9a825;}
+    .btn-delivery-info { background: #4568ea;}
+    .btn-payment { background: #0070f3;}
+    .btn-prod-paid { background: #ff9900;}
+    .btn-tracking { background: #34495e;}
+    .delivery-status-badge { padding: 2px 11px; border-radius: 11px; color: #fff; font-weight: bold; font-size: 0.99em; }
+    .status-placed { background: #bfc3cb; }
+    .status-shipped { background: #6c63ff;}
+    .status-couriered { background: #b24d98; }
+    .status-dispatched { background: #2bc26b;}
+    .status-delivered { background: #219f43;}
+    .status-pending { background: #e67e22;}
+    .paid-badge { background: #007d37;}
+    .cod-badge { background: #ffe600; color: #444;}
+    .pending-badge { background: #e67e22;}
+    .paid-via-cod-badge { background: #d65108;}
     .modal { display:none; position:fixed; top:10%; left:50%; transform:translateX(-50%); background:white; padding:20px; border-radius:8px; box-shadow:0 0 15px rgba(0,0,0,0.3); max-width:600px; max-height:80vh; overflow:auto; z-index:100;}
     .modal-header { font-weight:bold; font-size:20px; margin-bottom:10px;}
     .modal-close { float:right; background:none; border:none; font-size:22px; cursor:pointer;}
-    .modal-print { float:right; margin-right:10px; background:#3498db; color:#fff; border:none; border-radius:5px; font-size:15px; padding:5px 14px; cursor:pointer; }
+    .modal-print { float:right; margin-right:10px; background:#0070f3; color:#fff; border:none; border-radius:5px; font-size:15px; padding:5px 14px; cursor:pointer; }
     .modal-content { clear:both; margin-top:8px;}
-    .modal-extra-close { display:block; margin:20px auto 0 auto; background:#e67e22; color:#fff; border:none; border-radius:5px; font-size:16px; padding:7px 38px; cursor:pointer;}
+    .modal-extra-close { display:block; margin:20px auto 0 auto; background:#f9a825; color:#fff; border:none; border-radius:5px; font-size:16px; padding:7px 38px; cursor:pointer;}
     .prod-status-ind { padding:2px 8px; border-radius:5px; margin-right:3px; font-size:0.98em;}
-    .prod-status-pending{background:#ffe600;color:#222;}
-    .prod-status-confirmed{background:#3498db;color:#fff;}
-    .prod-status-delivered{background:#27ae60;color:#fff;}
+    .prod-status-placed{background:#bfc3cb;color:#444;}
+    .prod-status-shipped{background:#6c63ff;color:#fff;}
+    .prod-status-couriered{background:#b24d98;color:#fff;}
+    .prod-status-dispatched{background:#2bc26b;color:#fff;}
+    .prod-status-delivered{background:#219f43;color:#fff;}
+    .prod-status-pending{background:#e67e22;color:#fff;}
+    .prod-status-paid{background:#007d37; color: #fff;}
     .tracking-link {color:#0070f3;text-decoration:underline;word-break:break-all;display:inline-block;}
+    .btn-payment-status { background: #ff9900; }
+    .payment-status-indicator { margin-left:7px;font-weight:600;font-size:0.98em;}
   </style>
 </head>
 <body>
@@ -93,7 +113,7 @@
 <script>
   const supabase = window.supabase.createClient(
     'https://wamqheltqmufuzrqlxlb.supabase.co',
- 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
   );
 
   function showStatusMessage(msg, colorBg='#e3fbe3', colorText='#066306') {
@@ -107,6 +127,10 @@
 
   let currentUser = null;
   let currentTrackingOrderItemId = null;
+
+  const DELIVERY_STATUSES = [
+    "placed", "shipped", "couriered", "dispatched", "delivered"
+  ];
 
   async function loadSellerOrders() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -124,6 +148,8 @@
         total,
         status,
         created_at,
+        cod_paid,
+        cod_payment_status,
         profiles:customer_id(name, address, email, phone),
         order_items(
           id,
@@ -132,6 +158,9 @@
           price,
           hsn_code,
           status,
+          delivery_status,
+          cod_paid,
+          cod_payment_status,
           courier_name,
           courier_tracking_number,
           courier_tracking_url,
@@ -158,21 +187,37 @@
       const itemCodes = order.order_items.filter(
         item => item.profiles_seller && item.profiles_seller.id === user.id
       ).map(item => item.hsn_code || '-').join(', ');
-      const tr = document.createElement('tr');
+
+      // Determine overall delivery/payment status for the order
+      let overallStatus = order.order_items
+        .filter(item => item.profiles_seller && item.profiles_seller.id === user.id)
+        .map(item => item.delivery_status || item.status).reduce((a,b) =>{
+          // If any product not delivered, show appropriate earliest status
+          if (a === "delivered" && b !== "delivered") return b;
+          return a;
+        },"delivered");
+
+      let paymentStatus = order.order_items.some(i => i.cod_payment_status === "paid")
+        ? `<span class="paid-badge payment-status-indicator">Paid via COD</span>`
+        : (order.order_items.some(i => i.cod_payment_status === "pending" || i.cod_paid === false)
+        ? `<span class="pending-badge payment-status-indicator">Payment Pending</span>`
+        : '');
+
+      let tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${order.id}</td>
         <td>${order.profiles.name}</td>
-        <td>${order.status === 'delivered'
-          ? '<span class="delivered-status">Delivered & Paid</span>'
-          : order.status
-        }</td>
+        <td>
+          <span class="delivery-status-badge status-${overallStatus}">${overallStatus.charAt(0).toUpperCase() + overallStatus.slice(1)}</span>
+          ${paymentStatus}
+        </td>
         <td>${new Date(order.created_at).toLocaleString()}</td>
         <td>${itemCodes}</td>
         <td></td>
       `;
       tbody.appendChild(tr);
-
       const actionTd = tr.querySelector('td:last-child');
+
       const deliveryBtn = document.createElement('button');
       deliveryBtn.className = 'btn-delivery-info';
       deliveryBtn.textContent = 'Delivery Details';
@@ -191,20 +236,8 @@
     const filteredItems = order.order_items.filter(
       item => item.profiles_seller && item.profiles_seller.id === sellerId
     );
-    let deliveryStatus = '';
-    if (order.status === 'delivered') {
-      deliveryStatus = '<span class="delivered-status">Delivered & Paid</span>';
-    } else if (order.status === 'confirmed') {
-      deliveryStatus = '<span style="color:#3498db;font-weight:bold;">Confirmed but not delivered</span>';
-    } else if (order.status === 'pending') {
-      deliveryStatus = '<span style="color:#e67e22;font-weight:bold;">Pending confirmation</span>';
-    } else {
-      deliveryStatus = order.status;
-    }
-
     let html = `
       <div><strong>Order ID:</strong> ${order.id}</div>
-      <div><strong>Status:</strong> ${deliveryStatus}</div>
       <div><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</div>
       <div><strong>Customer Name:</strong> ${order.profiles.name || ''}</div>
       <div><strong>Email:</strong> ${order.profiles.email || ''}</div>
@@ -219,18 +252,48 @@
             <th>Qty</th>
             <th>Unit Price</th>
             <th>Total</th>
-            <th>Product Status</th>
+            <th>Delivery Status</th>
+            <th>Payment (COD)</th>
             <th>Tracking Info</th>
-            <th>Tracking Action</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
     `;
     filteredItems.forEach(item => {
-      let prodStatusClass = "prod-status-ind prod-status-pending";
-      if (item.status === "delivered") prodStatusClass = "prod-status-ind prod-status-delivered";
-      else if (item.status === "confirmed") prodStatusClass = "prod-status-ind prod-status-confirmed";
+      let prodStatusClass = "prod-status-ind";
+      let statusText = (item.delivery_status || item.status || "pending");
+      if (DELIVERY_STATUSES.includes(statusText)) prodStatusClass += ` prod-status-${statusText}`;
+      else prodStatusClass += ` prod-status-pending`;
 
+      // Next delivery step
+      let nextStepIdx = Math.min(DELIVERY_STATUSES.indexOf(statusText)+1, DELIVERY_STATUSES.length-1);
+      let availableBtns = '';
+      if (statusText !== "delivered") {
+        for (let i = DELIVERY_STATUSES.indexOf(statusText)+1;
+          i <= DELIVERY_STATUSES.length-1; i++) {
+          let step = DELIVERY_STATUSES[i];
+          let btnClass = {
+            shipped:"btn-shipped",couriered:"btn-couriered",
+            dispatched:"btn-dispatched",delivered:"btn-delivered"
+          }[step] || "btn-confirm";
+          availableBtns += `<button class="${btnClass}" onclick="updateDeliveryStatus(${item.id},'${step}')">${"Mark "+step.charAt(0).toUpperCase()+step.slice(1)}</button>`;
+          break; // Show only next step for clarity (for strict step flow)
+        }
+      }
+
+      // Payment/COD Section
+      let paymentSection = "-";
+      if(item.products && item.products.name && item.cod_payment_status !== undefined) {
+        if(item.cod_payment_status === "paid" || item.cod_paid) {
+          paymentSection = `<span class="paid-badge">COD Paid</span>`;
+        } else {
+          paymentSection = `<span class="cod-badge">COD Pending</span>
+            <button class="btn-payment-status" onclick="markCodPaid(${item.id})">Mark Paid</button>`;
+        }
+      }
+
+      // Tracking info
       let trackingHtml = '-';
       if (item.courier_tracking_number) {
         let trackingLink = item.courier_tracking_url ?
@@ -245,11 +308,11 @@
         <td>${item.quantity}</td>
         <td>₹${item.price}</td>
         <td>₹${item.price * item.quantity}</td>
-        <td><span class="${prodStatusClass}">${item.status || 'pending'}</span></td>
+        <td><span class="${prodStatusClass}">${statusText.charAt(0).toUpperCase()+statusText.slice(1)}</span><br>${availableBtns}</td>
+        <td>${paymentSection}</td>
         <td>${trackingHtml}</td>
         <td>
-          <button class="btn-tracking" onclick="openTrackingModal(${item.id}, '${item.courier_name || ''}', '${item.courier_tracking_number || ''}', '${item.courier_tracking_url || ''}')">Add/Update</button>
-          ${item.status !== 'delivered' ? `<button class="btn-prod-delivered" onclick="markProductDelivered(${item.id})">Mark Delivered</button>` : '<span class="delivered-status">Delivered</span>'}
+          <button class="btn-tracking" onclick="openTrackingModal(${item.id}, '${item.courier_name || ''}', '${item.courier_tracking_number || ''}', '${item.courier_tracking_url || ''}')">Tracking</button>
         </td>
       </tr>`;
     });
@@ -260,12 +323,24 @@
     document.getElementById('delivery-modal').style.display = 'block';
   }
 
-  window.markProductDelivered = async function(orderItemId) {
-    const { error } = await supabase.from('order_items').update({ status: 'delivered' }).eq('id', orderItemId);
+  window.updateDeliveryStatus = async function(orderItemId, nextStatus) {
+    const { error } = await supabase.from('order_items').update({ delivery_status: nextStatus }).eq('id', orderItemId);
     if (error) {
-      showStatusMessage('Failed to update product: ' + error.message, '#ffeded', '#a10021');
+      showStatusMessage('Failed to update status: ' + error.message, '#ffeded', '#a10021');
     } else {
-      showStatusMessage('Product marked as delivered.');
+      showStatusMessage('Status updated to ' + nextStatus + '.');
+      loadSellerOrders();
+      document.getElementById('delivery-modal').style.display = 'none';
+    }
+  };
+
+  window.markCodPaid = async function(orderItemId) {
+    // You may set both `cod_paid:true` and `cod_payment_status:'paid'` for clarity
+    const { error } = await supabase.from('order_items').update({ cod_paid: true, cod_payment_status: 'paid' }).eq('id', orderItemId);
+    if (error) {
+      showStatusMessage('Failed to update payment: ' + error.message, '#ffeded', '#a10021');
+    } else {
+      showStatusMessage('Payment marked as Paid.');
       loadSellerOrders();
       document.getElementById('delivery-modal').style.display = 'none';
     }
@@ -304,8 +379,20 @@
     }
   });
 
-  function closeTracking() {
-    document.getElementById('tracking-modal').style.display = 'none';
+  function closeTracking() { document.getElementById('tracking-modal').style.display = 'none'; }
+  function closeInvoice() { document.getElementById('invoice-modal').style.display = 'none'; }
+  function closeDelivery() { document.getElementById('delivery-modal').style.display = 'none'; }
+  function printInvoice() {
+    const invoiceContent = document.getElementById('invoice-html').innerHTML;
+    const printWindow = window.open('', '', 'width=800,height=700');
+    printWindow.document.write('<html><head><title>Invoice</title>');
+    printWindow.document.write('<style>body{font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;} .delivered-status{color:#27ae60;font-weight:bold;} .paid-status{color:#005bb5;font-weight:bold;}</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(invoiceContent);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
   }
 
   async function showInvoice(orderId, sellerId) {
@@ -321,6 +408,8 @@
           price,
           hsn_code,
           status,
+          delivery_status,
+          cod_payment_status,
           courier_name,
           courier_tracking_number,
           courier_tracking_url,
@@ -342,12 +431,9 @@
     );
 
     let sellerInfo = filteredItems[0]?.profiles_seller || {};
-    let statusDisplay = '';
-    if (order.status === 'delivered') {
-      statusDisplay = '<span class="delivered-status">Delivered & Paid</span>';
-    } else {
-      statusDisplay = order.status.charAt(0).toUpperCase() + order.status.slice(1);
-    }
+    let statusDisplay = (order.status === 'delivered')
+      ? '<span style="color:green;font-weight:bold;">Delivered & Paid</span>'
+      : order.status.charAt(0).toUpperCase() + order.status.slice(1);
 
     let html = `
       <h2>Invoice #${order.id}</h2>
@@ -370,15 +456,18 @@
       <hr>
       <table border="1" cellpadding="4" cellspacing="0" width="100%">
         <thead>
-          <tr><th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Product Status</th><th>Tracking Info</th></tr>
+          <tr><th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>Delivery Status</th><th>Payment (COD)</th><th>Tracking Info</th></tr>
         </thead>
         <tbody>
     `;
     filteredItems.forEach(item => {
-      let prodStatusClass = "prod-status-ind prod-status-pending";
-      if (item.status === "delivered") prodStatusClass = "prod-status-ind prod-status-delivered";
-      else if (item.status === "confirmed") prodStatusClass = "prod-status-ind prod-status-confirmed";
-
+      let prodStatusClass = "prod-status-ind";
+      let statusText = (item.delivery_status || item.status || "pending");
+      if (DELIVERY_STATUSES.includes(statusText)) prodStatusClass += ` prod-status-${statusText}`;
+      else prodStatusClass += ` prod-status-pending`;
+      let paymentBadge = (item.cod_payment_status==="paid")
+        ? '<span class="paid-badge">COD Paid</span>'
+        : '<span class="cod-badge">COD Pending</span>';
       let trackingHtml = '-';
       if (item.courier_tracking_number) {
         let trackingLink = item.courier_tracking_url ?
@@ -386,14 +475,14 @@
           : item.courier_tracking_number;
         trackingHtml = `${item.courier_name || ''}<br>${trackingLink}`;
       }
-
       html += `<tr>
         <td>${item.products.name}</td>
         <td>${item.hsn_code || '-'}</td>
         <td>${item.quantity}</td>
         <td>₹${item.price}</td>
         <td>₹${item.price * item.quantity}</td>
-        <td><span class="${prodStatusClass}">${item.status || 'pending'}</span></td>
+        <td><span class="${prodStatusClass}">${statusText.charAt(0).toUpperCase()+statusText.slice(1)}</span></td>
+        <td>${paymentBadge}</td>
         <td>${trackingHtml}</td>
       </tr>`;
     });
@@ -402,25 +491,6 @@
 
     document.getElementById('invoice-html').innerHTML = html;
     document.getElementById('invoice-modal').style.display = 'block';
-  }
-
-  function closeInvoice() {
-    document.getElementById('invoice-modal').style.display = 'none';
-  }
-  function closeDelivery() {
-    document.getElementById('delivery-modal').style.display = 'none';
-  }
-  function printInvoice() {
-    const invoiceContent = document.getElementById('invoice-html').innerHTML;
-    const printWindow = window.open('', '', 'width=800,height=700');
-    printWindow.document.write('<html><head><title>Invoice</title>');
-    printWindow.document.write('<style>body{font-family:Segoe UI,Tahoma,Geneva,Verdana,sans-serif;} .delivered-status{color:#27ae60;font-weight:bold;} .paid-status{color:#005bb5;font-weight:bold;}</style>');
-    printWindow.document.write('</head><body>');
-    printWindow.document.write(invoiceContent);
-    printWindow.document.write('</body></html>');
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
   }
 
   document.getElementById('close-invoice').onclick = closeInvoice;

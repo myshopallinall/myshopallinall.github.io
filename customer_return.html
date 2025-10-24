@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Request a Return - MyShop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { max-width: 900px; margin: 2rem auto; background: #fafafa; font-family: Arial, sans-serif; padding: 1rem; }
+    h1 { color: #222; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 10px; font-size: 0.95rem; }
+    th { background: #e6f0ff; color: #0070f3; font-weight: 600; }
+    textarea { width: 100%; height: 50px; resize: vertical; font-family: Arial, sans-serif; font-size: 0.9rem; padding: 6px; border-radius: 5px; border: 1px solid #ccc; }
+    textarea:disabled { background: #eee; }
+    button { background: #0070f3; color: white; border: none; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem; margin: 1rem auto 0; display: block; transition: background 0.3s ease; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    #msg { text-align: center; font-weight: 700; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+<h1>Request a Return</h1>
+<p>Only products from orders placed within the last 7 days are eligible.</p>
+
+<form id="returnForm">
+  <table>
+    <thead>
+    <tr>
+      <th>Select</th>
+      <th>Order ID</th>
+      <th>Product</th>
+      <th>Order Date</th>
+      <th>Qty</th>
+      <th>Reason</th>
+    </tr>
+    </thead>
+    <tbody id="orderItemsBody"></tbody>
+  </table>
+  <button id="submitReturnBtn" type="submit" disabled>Submit Return Request</button>
+</form>
+
+<div id="msg"></div>
+
+<script>
+  const supabase = supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+   );
+
+  const orderItemsBody = document.getElementById("orderItemsBody");
+  const submitBtn = document.getElementById("submitReturnBtn");
+  const msg = document.getElementById("msg");
+  let selectedItems = new Map();
+
+  function updateSubmitButton() {
+    submitBtn.disabled = selectedItems.size === 0;
+  }
+
+  async function loadOrderItems() {
+    msg.textContent = "Loading your recent order items...";
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      alert("Please login first.");
+      window.location.href = "login.html";
+      return;
+    }
+    const customerId = user.id;
+    const sevenDaysAgoISO = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+
+    // 1. Get orders for customer in last 7 days
+    const { data: orders, error: ordersError } = await supabase
+      .from('orders')
+      .select('id, created_at')
+      .eq('customer_id', customerId)
+      .gte('created_at', sevenDaysAgoISO);
+
+    if (ordersError) {
+      msg.textContent = "Failed to load orders: " + ordersError.message;
+      msg.style.color = "red";
+      return;
+    }
+
+    const orderIds = orders ? orders.map(o => o.id) : [];
+
+    // 2. Get order_items for those orders that are NOT returned
+    let orderItems = [];
+    if (orderIds.length) {
+      const { data: items, error: oiError } = await supabase
+        .from('order_items')
+        .select('id, order_id, quantity, returned, products(name), orders(created_at)')
+        .in('order_id', orderIds)
+        .eq('returned', false)
+        .order('order_id', { ascending: false });
+
+      if (oiError) {
+        msg.textContent = "Failed to load order items: " + oiError.message;
+        msg.style.color = "red";
+        return;
+      }
+      orderItems = items;
+    }
+
+    if (!orderItems.length) {
+      orderItemsBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No eligible order items found.</td></tr>`;
+      msg.textContent = "";
+      submitBtn.disabled = true;
+      return;
+    }
+
+    msg.textContent = "";
+    orderItemsBody.innerHTML = "";
+
+    orderItems.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="checkbox" data-item-id="${item.id}" /></td>
+        <td>${item.order_id}</td>
+        <td>${item.products.name}</td>
+        <td>${item.orders.created_at ? new Date(item.orders.created_at).toLocaleDateString() : ''}</td>
+        <td>${item.quantity}</td>
+        <td><textarea disabled placeholder="Enter reason for return"></textarea></td>
+      `;
+      orderItemsBody.appendChild(tr);
+
+      const checkbox = tr.querySelector('input[type="checkbox"]');
+      const textarea = tr.querySelector('textarea');
+
+      checkbox.addEventListener('change', () => {
+        if (checkbox.checked) {
+          textarea.disabled = false;
+          selectedItems.set(item.id, { id: item.id, quantity: item.quantity, reason: '' });
+        } else {
+          textarea.disabled = true;
+          textarea.value = '';
+          selectedItems.delete(item.id);
+        }
+        updateSubmitButton();
+      });
+
+      textarea.addEventListener('input', () => {
+        if (selectedItems.has(item.id)) {
+          selectedItems.get(item.id).reason = textarea.value.trim();
+        }
+      });
+    });
+  }
+
+  document.getElementById('returnForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    msg.textContent = "";
+    if (selectedItems.size === 0) {
+      msg.textContent = "Select at least one item to return.";
+      msg.style.color = "red";
+      return;
+    }
+    for (const item of selectedItems.values()) {
+      if (!item.reason || item.reason.length < 5) {
+        msg.textContent = "Please provide a reason of at least 5 characters for all selected items.";
+        msg.style.color = "red";
+        return;
+      }
+    }
+    try {
+      for (const item of selectedItems.values()) {
+        let { error: insertError } = await supabase.from('returns').insert([{
+          order_item_id: item.id,
+          quantity: item.quantity,
+          reason: item.reason,
+          created_at: new Date().toISOString()
+        }]);
+        if (insertError) throw insertError;
+
+        const { error: updateError } = await supabase.from('order_items').update({ returned: true }).eq('id', item.id);
+        if (updateError) throw updateError;
+      }
+      msg.style.color = "green";
+      msg.textContent = "Return request submitted successfully.";
+      selectedItems.clear();
+      submitBtn.disabled = true;
+      loadOrderItems();
+    } catch (err) {
+      msg.style.color = "red";
+      msg.textContent = "Failed to submit returns: " + err.message;
+    }
+  });
+  window.onload = loadOrderItems;
+</script>
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Return Request - MyShop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Montserrat', Arial, sans-serif;
+      background-color: #f3f4f6;
+      color: #1f2937;
+    }
+    .header {
+      background: linear-gradient(90deg, #232f3e 70%, #0070f3 100%);
+      color: #fff;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 4px 12px rgba(0, 112, 243, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header h1 {
+      font-size: 2rem;
+      margin: 0;
+      font-weight: 700;
+    }
+    .nav-group button {
+      background: transparent;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      margin-left: 18px;
+      padding: 6px 10px;
+      transition: background 0.3s ease;
+      border-radius: 4px;
+    }
+    .nav-group button:hover {
+      background-color: rgba(255, 255, 255, 0.15);
+    }
+    main {
+      max-width: 1000px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    h2 {
+      font-size: 1.8rem;
+      color: #111827;
+      border-bottom: 2px solid #0070f3;
+      display: inline-block;
+      padding-bottom: 6px;
+      font-weight: 700;
+    }
+    .msg {
+      padding: 1rem;
+      border-radius: 6px;
+      background-color: #f8fafc;
+      color: #374151;
+      font-weight: 600;
+      margin: 0.7rem 0;
+    }
+    form {
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+      padding: 1.5rem;
+      margin-top: 1rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.95rem;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid #e5e7eb;
+      vertical-align: middle;
+    }
+    th {
+      background-color: #f9fafb;
+      font-weight: 700;
+      color: #111827;
+      text-transform: uppercase;
+      font-size: 0.87rem;
+    }
+    tr:hover td {
+      background-color: #f3f6fb;
+    }
+    textarea {
+      width: 95%;
+      min-height: 50px;
+      font-family: inherit;
+      padding: 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      font-size: 0.95rem;
+      resize: vertical;
+      outline: none;
+      transition: border 0.3s ease, box-shadow 0.3s ease;
+    }
+    textarea:focus {
+      border-color: #0070f3;
+      box-shadow: 0 0 0 3px rgba(0,112,243,0.2);
+    }
+    input[type="checkbox"] {
+      transform: scale(1.2);
+      cursor: pointer;
+    }
+    button[type="submit"] {
+      background: linear-gradient(90deg, #e91e63 0%, #f43f5e 100%);
+      color: white;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 10px 24px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 1rem;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+      transition: all 0.3s ease;
+    }
+    button[type="submit"]:hover {
+      box-shadow: 0 5px 12px rgba(0,0,0,0.2);
+      background: linear-gradient(90deg, #ff4081 0%, #ff1744 100%);
+    }
+    button[disabled] {
+      background: #d1d5db;
+      color: #6b7280;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .returns-box {
+      background: #fff;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+      border-radius: 10px;
+      margin-top: 2rem;
+    }
+    .returns-box h3 {
+      font-size: 1.22rem;
+      color: #111827;
+      margin-bottom: 0.8rem;
+      font-weight: 700;
+      border-left: 4px solid #0070f3;
+      padding-left: 10px;
+    }
+    .returns-box table {
+      font-size: 0.9rem;
+    }
+    .no-data {
+      text-align: center;
+      color: #6b7280;
+      padding: 1.2rem;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+<div class="header">
+  <h1>MyShop</h1>
+  <div class="nav-group">
+    <button onclick="window.location.href='custdashboard.html'">Home</button>
+    <button onclick="window.location.href='order.html'">Your Orders</button>
+    <button onclick="logout()">Logout</button>
+  </div>
+</div>
+
+<main>
+  <h2>Request a Return</h2>
+  <div id="return-msg" class="msg"></div>
+  <form id="returnForm">
+    <table>
+      <thead>
+      <tr>
+        <th>Select</th><th>Order ID</th><th>Product</th><th>Order Date</th><th>Qty</th><th>Reason</th>
+      </tr>
+      </thead>
+      <tbody id="orderItemsBody"></tbody>
+    </table>
+    <button id="submitReturnBtn" type="submit" disabled>Submit Return Request</button>
+  </form>
+
+  <div class="returns-box" id="yourReturns"></div>
+</main>
+
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+  let customerId = null;
+  let selectedItems = new Map();
+
+  checkLogin();
+  async function checkLogin() {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) { alert('Login first!'); window.location.href='login.html'; return; }
+    customerId = data.user.id;
+    loadReturnEligibleItems();
+  }
+
+  function toggleSubmit() {
+    document.getElementById('submitReturnBtn').disabled = selectedItems.size === 0;
+  }
+
+  async function loadReturnEligibleItems() {
+    const msg = document.getElementById('return-msg');
+    msg.textContent = "Loading eligible orders...";
+    msg.style.color = "#111827";
+    const body = document.getElementById("orderItemsBody");
+    selectedItems.clear();
+    const weekAgo = new Date(Date.now() - 7*24*60*60*1000).toISOString();
+    const { data: orders } = await supabase.from('orders').select('id, created_at').eq('customer_id', customerId).gte('created_at', weekAgo);
+    const orderIds = orders ? orders.map(o => o.id) : [];
+    let orderItems = [];
+    if (orderIds.length) {
+      const { data: items } = await supabase.from('order_items').select('id, quantity, returned, order_id, products(name), orders(created_at)').in('order_id', orderIds).or('returned.is.null,returned.eq.false');
+      orderItems = items || [];
+    }
+    body.innerHTML = "";
+    if (!orderItems.length) {
+      body.innerHTML = `<tr><td colspan="6" class="no-data">No eligible items for return within last 7 days.</td></tr>`;
+      msg.textContent = "";
+      toggleSubmit(); loadCustomerReturns(); return;
+    }
+    msg.textContent = "";
+    for (const item of orderItems) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input type="checkbox" data-id="${item.id}" /></td>
+        <td>${item.order_id}</td>
+        <td>${item.products?.name ?? ''}</td>
+        <td>${item.orders?.created_at ? new Date(item.orders.created_at).toLocaleDateString() : ''}</td>
+        <td>${item.quantity}</td>
+        <td><textarea disabled placeholder="Enter return reason"></textarea></td>
+      `;
+      body.appendChild(tr);
+      const checkbox = tr.querySelector('input');
+      const textarea = tr.querySelector('textarea');
+      checkbox.onchange = () => {
+        if (checkbox.checked) {
+          textarea.disabled = false;
+          selectedItems.set(item.id, { id: item.id, quantity: item.quantity, reason: '' });
+        } else {
+          textarea.value = ''; textarea.disabled = true;
+          selectedItems.delete(item.id);
+        }
+        toggleSubmit();
+      };
+      textarea.oninput = () => {
+        if (selectedItems.has(item.id))
+          selectedItems.get(item.id).reason = textarea.value.trim();
+      };
+    }
+    toggleSubmit();
+    loadCustomerReturns();
+  }
+
+  document.getElementById('returnForm').onsubmit = async e => {
+    e.preventDefault();
+    const msg = document.getElementById('return-msg');
+    msg.textContent = '';
+    if (!selectedItems.size) return;
+
+    for (const item of selectedItems.values()) {
+      if (!item.reason || item.reason.length < 5) {
+        msg.textContent = 'Enter valid return reason (min 5 chars) for each item.';
+        msg.style.color = 'red';
+        return;
+      }
+    }
+
+    try {
+      for (const item of selectedItems.values()) {
+        await supabase.from('returns').insert([{ order_item_id: item.id, quantity: item.quantity, reason: item.reason, customer_id: customerId, created_at: new Date().toISOString() }]);
+        await supabase.from('order_items').update({ returned: true }).eq('id', item.id);
+      }
+      msg.style.color = 'green';
+      msg.textContent = 'Return submitted successfully!';
+      selectedItems.clear();
+      toggleSubmit();
+      loadReturnEligibleItems();
+    } catch (err) {
+      msg.textContent = 'Error: ' + err.message;
+      msg.style.color = 'red';
+    }
+  };
+
+  async function loadCustomerReturns() {
+    const wrap = document.getElementById('yourReturns');
+    const { data } = await supabase.from('returns').select(`created_at, reason, quantity, order_item_id, order_items(order_id, products(name))`).eq('customer_id', customerId).order('created_at', { ascending: false }).limit(10);
+    if (!data || !data.length) {
+      wrap.innerHTML = `<div class="no-data">No recent return requests.</div>`;
+      return;
+    }
+    let html = `<h3>Your Recent Returns</h3><table><tr><th>Order</th><th>Product</th><th>Qty</th><th>Reason</th><th>Date</th></tr>`;
+    for (const r of data) {
+      html += `<tr>
+        <td>${r.order_items?.order_id ?? ''}</td>
+        <td>${r.order_items?.products?.name ?? ''}</td>
+        <td>${r.quantity}</td>
+        <td>${r.reason}</td>
+        <td>${new Date(r.created_at).toLocaleDateString()}</td>
+      </tr>`;
+    }
+    html += `</table>`;
+    wrap.innerHTML = html;
+  }
+
+  async function logout() {
+    await supabase.auth.signOut();
+    window.location.href = 'login.html';
+  }
+</script>
+</body>
+</html>

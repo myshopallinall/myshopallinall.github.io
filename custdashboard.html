@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Customer Dashboard - MyShop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --primary: #fbb034;
+      --secondary: #232f3e;
+      --accent: #e91e63;
+      --price: #ed2b77;
+      --bg: #f7fafc;
+      --border: #e6e7ec;
+      --muted: #7a8499;
+      --hover: #fddb7a;
+      --stock: #079c44;
+      --danger: #b8062b;
+      --sale: #ed2b77;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Montserrat', 'Roboto', Arial, sans-serif;
+      background: var(--bg);
+      margin: 0;
+      min-height: 100vh;
+      color: #222;
+    }
+    .header {
+      background: linear-gradient(90deg,#232f3e 70%,#fbb034 100%);
+      color: #fff;
+      padding: 1.2rem 3vw;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 4px 20px #2221  ;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 2.5rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+    }
+    .nav-group {
+      display: flex;
+      gap: 18px;
+    }
+    .nav-group button {
+      background: var(--primary);
+      color: var(--secondary);
+      font-weight: bold;
+      font-size: 1.1em;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 28px;
+      cursor: pointer;
+      box-shadow: 0 2px 13px #fdbe341a;
+      transition: background .2s, color .2s, transform .08s;
+      letter-spacing: .04em;
+    }
+    .nav-group button:hover, .nav-group button:focus {
+      background: var(--secondary);
+      color: #fff;
+      outline: none;
+      transform: translateY(-2px) scale(1.05);
+    }
+    main {
+      max-width: 1400px;
+      margin: 2.5rem auto 2rem;
+      padding: 0 14px;
+    }
+    .products-section {
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 7px 36px #232f3e13;
+      padding: 2.2rem 2.5rem 2.6rem;
+      margin-bottom: 2rem;
+    }
+    .products-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 2rem 1.2rem;
+      margin-bottom: 2.2rem;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: .8rem;
+    }
+    .products-header h2 {
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: var(--secondary);
+      margin: 0;
+      letter-spacing: .03em;
+    }
+    .search-sort-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      align-items: center;
+    }
+    .search-bar, .sort-select {
+      padding: .86em 1.25em;
+      font-size: 1em;
+      border-radius: 9px;
+      border: 2px solid var(--border);
+      background: #f8fafb;
+      color: #232f3e;
+      min-width: 160px;
+      transition: border .15s, box-shadow .17s;
+    }
+    .search-bar:focus, .sort-select:focus {
+      border: 2px solid var(--primary);
+      outline: 2px solid #ffe44055;
+      background: #fffbef;
+    }
+    #products-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill,minmax(254px,1fr));
+      gap: 2.2rem 1.3rem;
+    }
+    .product-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 6px 36px #232f3e14;
+      padding: 1.2rem 1rem 1.6rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      transition: box-shadow .16s, transform .09s;
+      overflow: hidden;
+    }
+    .product-card:hover, .product-card:focus {
+      box-shadow: 0 16px 40px 0 #ffd60046, 0 10px 50px 0 #232f3e17;
+      z-index: 2;
+      transform: translateY(-3px) scale(1.017);
+      outline: none;
+    }
+    .product-badge {
+      position: absolute;
+      top: 17px;
+      left: 17px;
+      padding: 2px 11px 2px 10px;
+      border-radius: 13px;
+      font-size: 0.86em;
+      font-weight: bold;
+      background: linear-gradient(97deg, var(--primary), var(--accent));
+      color: #fff;
+      box-shadow: 0 1px 7px #e91e6327;
+      letter-spacing: .05em;
+      z-index: 5;
+      display: none;
+    }
+    .featured .product-badge {
+      display: inline-block;
+    }
+    .product-img-wrap {
+      width: 134px; min-height: 134px;
+      background: #fafbfe;
+      border-radius: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 12px #deb94533;
+      margin-bottom: 1.02rem;
+      overflow: hidden;
+      position: relative;
+    }
+    .product-card img {
+      width: 130px; height: 130px;
+      border-radius: 9px;
+      object-fit: cover;
+      background: #f6f7fa;
+      display: block;
+      transition: transform .18s cubic-bezier(.34,1.56,.64,1);
+    }
+    .product-card:hover img {
+      transform: scale(1.10) rotate(-1.7deg);
+    }
+    .product-name {
+      font-size: 1.09rem;
+      font-weight: 700;
+      margin: .18rem 0 .16rem 0;
+      color: #222d48;
+      text-align: center;
+      min-height: 32px;
+      line-height: 1.29;
+    }
+    .product-price {
+      color: var(--price);
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-bottom: 0.38rem;
+      margin-top: 0.02rem;
+      letter-spacing:.02em;
+    }
+    .product-seller {
+      font-size: 0.98em;
+      color: var(--muted);
+      font-style: italic;
+      margin-bottom: .1rem;
+    }
+    .stock-label {
+      font-weight: 700;
+      font-size: 0.95em;
+      margin-bottom: .65rem;
+      color: var(--stock);
+    }
+    .stock-label.out {
+      color: var(--danger);
+    }
+    .add-cart-btn {
+      font-weight: 700;
+      font-size: 1.09em;
+      padding: 11px 28px;
+      background: linear-gradient(80deg,#fbb034 60%,#ed2b77 130%);
+      color: #fff;
+      border:none;
+      border-radius:10px;
+      margin-top:.15rem;
+      cursor:pointer;
+      box-shadow: 0 3px 12px #fbb03418;
+      letter-spacing: .02em;
+      transition: background .17s, color .15s, box-shadow .14s;
+      outline: none;
+    }
+    .add-cart-btn:disabled {
+      background: #bfc3cb;
+      color: #f8fafb;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    .add-cart-btn:not(:disabled):hover, .add-cart-btn:focus-visible {
+      background: #9747ff;
+      color: #fff;
+      box-shadow: 0 5px 20px #e91e6355, 0 0 0 2px #ffd60044;
+    }
+    .cart-empty {
+      color: #8c8f9f;
+      background: #f5f6fa;
+      padding: 1.3rem 1.3rem;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 1.06rem;
+      margin-top: 1.7rem;
+      text-align: center;
+      user-select: none;
+      box-shadow: 0 1px 12px #232f3e10;
+    }
+    @media (max-width: 960px) {
+      .products-section {padding: 1rem 0.2rem 1.1rem;}
+      .header {padding: 1rem 0.2rem;}
+      .products-header {flex-direction: column;align-items:stretch;gap:.92rem;}
+      main {padding: 0 0.13rem;}
+      #products-list {gap: 1.2rem;}
+    }
+    @media (max-width: 700px) {
+      .header h1 {font-size: 1.5rem;}
+    }
+    @media (max-width: 550px) {
+      .products-header h2 {font-size: 1.08rem;}
+      .add-cart-btn {font-size: 1em;}
+    }
+  </style>
+</head>
+<body>
+<div class="header">
+  <h1>MyShop</h1>
+  <div class="nav-group">
+    <button onclick="window.location.href='cart.html'">Your Cart</button>
+    <button onclick="window.location.href='order.html'">Your Orders</button>
+    <button onclick="logout()">Logout</button>
+  </div>
+</div>
+<main>
+  <div class="products-section">
+    <div class="products-header">
+      <h2>Latest Products</h2>
+      <div class="search-sort-wrap">
+        <input class="search-bar" id="searchInput" type="text" placeholder="Search products..." oninput="renderProducts()" />
+        <select class="sort-select" id="categorySelect" onchange="renderProducts()">
+          <option value="">All Categories</option>
+        </select>
+        <select class="sort-select" id="sellerSelect" onchange="renderProducts()">
+          <option value="">All Sellers</option>
+        </select>
+        <select class="sort-select" id="sortSelect" onchange="renderProducts()">
+          <option value="latest">Sort: Latest</option>
+          <option value="name_asc">Name (A-Z)</option>
+          <option value="name_desc">Name (Z-A)</option>
+          <option value="price_asc">Price Low-High</option>
+          <option value="price_desc">Price High-Low</option>
+          <option value="category_asc">Category (A-Z)</option>
+          <option value="category_desc">Category (Z-A)</option>
+        </select>
+      </div>
+    </div>
+    <div id="products-list"></div>
+  </div>
+</main>
+<script>
+  const supabase = window.supabase.createClient('https://wamqheltqmufuzrqlxlb.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY');
+  let customerId = null, allProducts = [];
+  checkLogin();
+  async function checkLogin() {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) { alert('Please login first!'); window.location.href = 'login.html'; }
+    customerId = data.user.id;
+    loadProducts();
+  }
+  async function loadProducts() {
+    const { data, error } = await supabase.from('products').select('id,name,description,price,stock,category,image_url,accept_cod,seller_id,profiles(name)').order('id', { ascending: false });
+    if (error) { allProducts = []; renderProducts(); return; }
+    allProducts = data || [];
+    populateCategories(); populateSellers(); renderProducts();
+  }
+  function populateCategories() {
+    const cats = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+    const categorySelect = document.getElementById('categorySelect');
+    categorySelect.innerHTML = '<option value="">All Categories</option>';
+    cats.forEach(cat => { const o=document.createElement('option'); o.value=cat; o.textContent=cat; categorySelect.appendChild(o); });
+  }
+  function populateSellers() {
+    const sellers = [...new Map(allProducts.filter(p=>p.profiles&&p.profiles.name).map(p=>[p.seller_id,p.profiles.name])).entries()];
+    const sellerSelect=document.getElementById('sellerSelect'); sellerSelect.innerHTML='<option value="">All Sellers</option>';
+    sellers.forEach(([id,name])=>{const o=document.createElement('option');o.value=id;o.textContent=name;sellerSelect.appendChild(o);});
+  }
+  window.renderProducts=function(){
+    const searchText = document.getElementById('searchInput').value.toLowerCase();
+    const categoryFilter = document.getElementById('categorySelect').value;
+    const sellerFilter = document.getElementById('sellerSelect').value;
+    const sortBy = document.getElementById('sortSelect').value;
+    let filtered = allProducts.filter(p=>{
+      const nameMatch = p.name ? p.name.toLowerCase().includes(searchText):false;
+      const descMatch = p.description ? p.description.toLowerCase().includes(searchText):false;
+      const catMatch = categoryFilter === '' || p.category === categoryFilter;
+      const sellerMatch = sellerFilter === '' || p.seller_id === sellerFilter;
+      return (nameMatch||descMatch) && catMatch && sellerMatch;
+    });
+
+    if (sortBy === 'name_asc') filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    else if (sortBy === 'name_desc') filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+    else if (sortBy === 'price_asc') filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
+    else if (sortBy === 'price_desc') filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
+    else if (sortBy === 'category_asc') filtered.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
+    else if (sortBy === 'category_desc') filtered.sort((a, b) => (b.category || '').localeCompare(a.category || ''));
+
+    const container = document.getElementById('products-list');
+    container.innerHTML = '';
+    if (!filtered.length) { container.innerHTML = '<div class="cart-empty">No products found.</div>'; return; }
+    filtered.forEach((prod, idx)=>{
+      const isOutStock = prod.stock==null || prod.stock<=0;
+      let isFeatured = (idx<3); // Top 3 highlighted, for demo only, customize for real logic
+      let div = document.createElement('div');
+      div.className = 'product-card' + (isFeatured ? ' featured':'');
+      div.tabIndex = 0;
+      div.innerHTML = `
+        <div class="product-img-wrap">
+          <img src="${prod.image_url || 'https://via.placeholder.com/130?text=No+Image'}" alt="${prod.name || ''}" />
+        </div>
+        <div class="product-name">${prod.name || '-'}</div>
+        <div class="product-price">₹${prod.price !== undefined ? prod.price : '-'}</div>
+        <div class="product-seller">Seller: ${prod.profiles?.name || 'N/A'}</div>
+        <span class="stock-label${isOutStock?' out':''}">
+          ${isOutStock ? 'Out of Stock' : ('In Stock: ' + prod.stock)}
+        </span>
+        <button class="add-cart-btn" ${isOutStock?'disabled':''} onclick="addToCart('${prod.id}')">
+          ${isOutStock ? 'Out of Stock' : 'Add to Cart'}
+        </button>`;
+      container.appendChild(div);
+    });
+  };
+  window.addToCart = async function(productId){
+    const product = allProducts.find(p=>String(p.id)===String(productId)); // Fix for type mismatch
+    if (!product) { alert('Product not found!'); return; }
+    if (!product.stock||product.stock<=0) { alert('Sorry, this product is currently out of stock.'); return; }
+    try {
+      const { data: item } = await supabase.from('cart').select('*').eq('customer_id', customerId).eq('product_id', productId).maybeSingle();
+      if (item) {
+        if (item.quantity >= product.stock) { alert('You have reached the max available stock for this product.'); return;}
+        await supabase.from('cart').update({ quantity: item.quantity + 1 }).eq('id', item.id);
+      } else {
+        await supabase.from('cart').insert([{ customer_id: customerId, product_id: productId, quantity: 1 }]);
+      }
+      alert('Added to cart!');
+    } catch (error) { alert('Cart Error: '+ error.message); }
+  };
+  window.logout = async function() {
+    await supabase.auth.signOut();
+    window.location.href = "login.html";
+  };
+</script>
+</body>
+</html>

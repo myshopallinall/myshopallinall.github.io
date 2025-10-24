@@ -6,17 +6,22 @@
   <title>Login - MyShop</title>
   <style>
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f2f5fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
-    #login-form { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 360px; width: 100%; }
-    #login-form h2 { margin-bottom: 1rem; color: #0070f3; text-align: center; }
+    #login-form, #reset-form { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 360px; width: 100%; }
+    #login-form h2, #reset-form h2 { margin-bottom: 1rem; color: #0070f3; text-align: center; }
     input, select, button { width: 100%; padding: 0.8rem; margin: 0.5rem 0 1rem 0; border-radius: 6px; border: 1.5px solid #ddd; font-size: 1rem; }
     button { background-color: #0070f3; color: white; font-weight: bold; border: none; cursor: pointer; transition: background-color 0.25s ease; }
     button:hover { background-color: #005bb5; }
     .error { color: #e74c3c; margin-bottom: 1rem; font-weight: bold; }
     .success { color: #27ae60; margin-bottom: 1rem; font-weight: bold; }
     .link { color: #0070f3; text-align: right; font-size: 0.98rem; margin-bottom: 0.6rem; text-decoration: underline; cursor: pointer;}
+    /* Forgot password modal */
+    #forgot-modal { display:none; position:fixed; top:0; left:0;width:100vw;height:100vh; background:#0008;justify-content:center;align-items:center; z-index:2;}
+    #forgot-form {background:white;padding:2rem;border-radius:10px;max-width:340px;width:100%;box-shadow:0 4px 16px #0002;display:flex;flex-direction:column;}
+    #forgot-form h3 { color:#0070f3; margin-bottom:0.8rem;}
   </style>
 </head>
 <body>
+
 <form id="login-form">
   <h2>Login</h2>
   <div id="message"></div>
@@ -28,8 +33,31 @@
     <option value="seller">Seller</option>
   </select>
   <button type="submit">Login</button>
+  <div class="link" id="forgot-link">Forgot password?</div>
   <div class="link" onclick="window.location.href='signup.html'">New user? Sign up</div>
 </form>
+
+<!-- Forgot Password Modal -->
+<div id="forgot-modal">
+  <form id="forgot-form">
+    <h3>Reset Password</h3>
+    <input type="email" id="forgot-email" placeholder="Enter your email" required />
+    <button type="submit">Send Reset Email</button>
+    <button type="button" id="close-forgot" style="margin-top:4px;">Cancel</button>
+    <div id="forgot-message" style="margin-top:8px"></div>
+  </form>
+</div>
+
+<!-- Hidden Reset Password Form: displayed if "#access_token" is in URL hash -->
+<div id="reset-container" style="display:none;">
+  <form id="reset-form">
+    <h2>Set New Password</h2>
+    <input type="password" id="new-password" placeholder="New password" required />
+    <button type="submit">Reset Password</button>
+    <div id="reset-message"></div>
+  </form>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   window.onload = function() {
@@ -38,6 +66,7 @@
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
     );
 
+    // 1. Regular login handling
     const form = document.getElementById('login-form');
     const messageDiv = document.getElementById('message');
     form.onsubmit = async function(e) {
@@ -79,7 +108,61 @@
         messageDiv.className = 'error';
       }
     };
-  }
+
+    // 2. Forgot password modal handlers
+    const forgotModal = document.getElementById('forgot-modal');
+    document.getElementById('forgot-link').onclick = () => forgotModal.style.display='flex';
+    document.getElementById('close-forgot').onclick = () => forgotModal.style.display='none';
+
+    document.getElementById('forgot-form').onsubmit = async function(e) {
+      e.preventDefault();
+      const email = document.getElementById('forgot-email').value.trim();
+      const msg = document.getElementById('forgot-message');
+      msg.textContent = "Sending reset email...";
+      try {
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + window.location.pathname // points to same page
+        });
+        if (error) throw error;
+        msg.textContent = "Reset email sent! Check your inbox.";
+      } catch (err) {
+        msg.textContent = "Error: " + err.message;
+      }
+    };
+
+    // 3. Display reset password form if URL hash contains access_token
+    function showResetFormIfNeeded() {
+      if (window.location.hash.includes("access_token")) {
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('forgot-modal').style.display = 'none';
+        document.getElementById('reset-container').style.display = 'block';
+      }
+    }
+    showResetFormIfNeeded();
+    window.addEventListener('hashchange', showResetFormIfNeeded);
+
+    // 4. Handle password reset form submission
+    document.getElementById('reset-form').onsubmit = async function(e) {
+      e.preventDefault();
+      const newPassword = document.getElementById('new-password').value;
+      const msg = document.getElementById('reset-message');
+      msg.textContent = "Updating password...";
+      msg.className = "";
+      // Wait until Supabase recognizes PASSWORD_RECOVERY mode
+      supabase.auth.onAuthStateChange(async (event) => {
+        if (event === "PASSWORD_RECOVERY" || window.location.hash.includes("access_token")) {
+          const { error } = await supabase.auth.updateUser({ password: newPassword });
+          if (error) {
+            msg.textContent = "Error: " + error.message;
+            msg.className = "error";
+          } else {
+            msg.textContent = "Password updated! You can now log in with your new password.";
+            msg.className = "success";
+          }
+        }
+      });
+    };
+  };
 </script>
 </body>
 </html>

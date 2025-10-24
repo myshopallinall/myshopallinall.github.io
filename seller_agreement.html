@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Seller Agreement - MyShop</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet"/>
+  <style>
+    body {
+      font-family: 'Montserrat', Arial, sans-serif;
+      background: #f8fafc;
+      margin: 0; padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      max-width: 840px;
+      border-radius: 10px;
+      box-shadow: 0 8px 28px rgb(0 112 243 / 0.15);
+      padding: 24px 32px 32px 32px;
+      overflow-y: auto;
+      max-height: 90vh;
+    }
+    h1 {
+      color: #0070f3;
+      font-weight: 700;
+      margin-bottom: 12px;
+      font-size: 2.2rem;
+      text-align: center;
+      letter-spacing: 0.03em;
+    }
+    .subtitle {
+      font-size: 1.05rem;
+      font-weight: 500;
+      text-align: center;
+      margin-bottom: 30px;
+      color: #334e68;
+    }
+    .content {
+      font-size: 1rem;
+      line-height: 1.5;
+      color: #323f4b;
+      border: 1px solid #d2dae2;
+      padding: 16px 22px;
+      border-radius: 8px;
+      max-height: 58vh;
+      overflow-y: scroll;
+      margin-bottom: 20px;
+      background: #f4f8ff;
+    }
+    .content ol {
+      padding-left: 1.5em;
+      margin-bottom: 0;
+    }
+    .content li {
+      margin-bottom: 14px;
+      font-weight: 500;
+    }
+    label {
+      font-weight: 600;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      gap: 14px;
+      margin-top: 18px;
+      margin-bottom: 18px;
+    }
+    input[type="checkbox"] {
+      width: 22px;
+      height: 22px;
+      cursor: pointer;
+    }
+    button {
+      width: 100%;
+      padding: 14px 0;
+      background: #0070f3;
+      color: white;
+      font-size: 1.12rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      box-shadow: 0 4px 14px #127dea80;
+      letter-spacing: 0.05em;
+      user-select: none;
+    }
+    button:disabled {
+      background: #a4c8fc;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    button:hover:not(:disabled) {
+      background: #005bb5;
+    }
+    .downloadable {
+      margin-top: 12px;
+      font-size: 0.95rem;
+      text-align: center;
+    }
+    .downloadable a {
+      color: #0070f3;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .downloadable a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Seller Agreement & Terms</h1>
+  <div class="subtitle">Please read and accept our seller policies to proceed</div>
+  <div class="content" tabindex="0" aria-label="Seller agreement content">
+    <ol>
+      <li><strong>Legal Entity and KYC:</strong> I confirm my business is legally registered in India and I will provide accurate GST, PAN, and address proof as required.</li>
+      <li><strong>Product Authenticity:</strong> I will only list genuine and legal products/services, complying with all applicable Indian laws and regulations.</li>
+      <li><strong>Pricing & Tax Compliance:</strong> I am responsible for setting pricing including all applicable GST and TDS. I agree to comply with GST registration & filing.</li>
+      <li><strong>Order Fulfillment:</strong> I will promptly process and dispatch orders meeting quality standards and delivery commitments.</li>
+      <li><strong>Payment Policy:</strong> Payments shall be made as per transaction confirmation, excluding returns, commissions, charges, and as per contractual timelines.</li>
+      <li><strong>Return & Cancellation:</strong> I will adhere to MyShop’s returns and cancellation policy, compliant with Indian Consumer Protection Law and E-Commerce Rules 2020.</li>
+      <li><strong>Data Privacy:</strong> I agree to adhere to IT and data privacy laws, keeping customer data confidential and only using it for order fulfillment.</li>
+      <li><strong>Compliance & Liability:</strong> I indemnify MyShop from any third-party claims arising from non-compliance or breach of terms under Indian laws.</li>
+      <li><strong>Dispute Resolution:</strong> Any disputes shall be resolved under Chennai jurisdiction by Indian Arbitration & Conciliation Act 1996.</li>
+      <li><strong>Acceptance:</strong> By ticking the checkbox below, I agree this is a legal contract binding under Indian Contract Act 1872.</li>
+    </ol>
+  </div>
+  <label>
+    <input type="checkbox" id="acceptTerms" />
+    I have read, understood, and accept all the terms and policies above.
+  </label>
+  <button id="btnAgree" disabled>Accept & Continue</button>
+  <div class="downloadable">
+    <a href="seller_agreement.pdf" target="_blank" rel="noopener">Download Full Agreement PDF</a>
+  </div>
+</div>
+
+<script>
+  const checkbox = document.getElementById('acceptTerms');
+  const btn = document.getElementById('btnAgree');
+
+  checkbox.addEventListener('change', () => {
+    btn.disabled = !checkbox.checked;
+  });
+
+  btn.addEventListener('click', () => {
+    if (!checkbox.checked) {
+      alert('You must accept the seller agreement to proceed.');
+      return;
+    }
+    // Save acceptance record in your backend here (e.g., Supabase)
+    // Then redirect or continue seller registration
+    alert('Thank you for accepting our terms. Proceeding...');
+    window.location.href = 'signup.html'; // or wherever next
+  });
+</script>
+</body>
+</html>

@@ -10,10 +10,12 @@
     #signup-form h2 { margin-bottom: 1rem; color: #0070f3; text-align: center; }
     input, select, button { width: 100%; padding: 0.8rem; margin: 0.5rem 0 1rem 0; border-radius: 6px; border: 1.5px solid #ddd; font-size: 1rem; }
     button { background-color: #0070f3; color: white; font-weight: bold; border: none; cursor: pointer; transition: background-color 0.25s ease; }
-    button:hover { background-color: #005bb5; }
+    button:hover:not(:disabled) { background-color: #005bb5; }
     .error { color: #e74c3c; margin-bottom: 1rem; font-weight: bold; }
     .success { color: #27ae60; margin-bottom: 1rem; font-weight: bold; }
-    .link { color: #0070f3; text-align: right; font-size: 0.98rem; margin-bottom: 0.6rem; text-decoration: underline; cursor: pointer;}
+    .link { color: #0070f3; text-align: right; font-size: 0.98rem; margin-bottom: 0.6rem; text-decoration: underline; cursor: pointer; }
+    #agreement-container { display: none; margin-bottom: 1rem; font-size: 0.9rem; }
+    #agreement-container label { cursor: pointer; }
   </style>
 </head>
 <body>
@@ -29,7 +31,11 @@
   </select>
   <input type="text" id="gst_number" placeholder="GST Number (required for sellers)" style="display:none;" />
   <input type="text" id="pan_number" placeholder="PAN Number (required for sellers)" style="display:none;" />
-  <button type="submit">Sign Up</button>
+  <div id="agreement-container">
+    <input type="checkbox" id="acceptAgreement" />
+    <label for="acceptAgreement">I have read and accept the <a href="seller_agreement.html" target="_blank">Seller Agreement & Policies</a>.</label>
+  </div>
+  <button type="submit" id="submitButton" disabled>Sign Up</button>
   <div class="link" onclick="window.location.href='login.html'">Already have an account? Login</div>
 </form>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -37,13 +43,16 @@
   window.onload = function() {
     const supabase = window.supabase.createClient(
       'https://wamqheltqmufuzrqlxlb.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+      'your-anon-key-here'
     );
     const form = document.getElementById('signup-form');
     const messageDiv = document.getElementById('message');
     const roleSelect = document.getElementById('role');
     const gstInput = document.getElementById('gst_number');
     const panInput = document.getElementById('pan_number');
+    const agreementContainer = document.getElementById('agreement-container');
+    const acceptAgreement = document.getElementById('acceptAgreement');
+    const submitButton = document.getElementById('submitButton');
 
     function toggleTaxFields() {
       if (roleSelect.value === 'seller') {
@@ -51,6 +60,8 @@
         panInput.style.display = 'block';
         gstInput.required = true;
         panInput.required = true;
+        agreementContainer.style.display = 'block';
+        updateSubmitState();
       } else {
         gstInput.style.display = 'none';
         panInput.style.display = 'none';
@@ -58,10 +69,26 @@
         panInput.required = false;
         gstInput.value = '';
         panInput.value = '';
+        agreementContainer.style.display = 'none';
+        submitButton.disabled = false; // customers no need agreement
       }
     }
 
-    roleSelect.addEventListener('change', toggleTaxFields);
+    function updateSubmitState() {
+      if (roleSelect.value === 'seller') {
+        submitButton.disabled = !acceptAgreement.checked;
+      } else {
+        submitButton.disabled = false;
+      }
+    }
+
+    roleSelect.addEventListener('change', () => {
+      toggleTaxFields();
+    });
+
+    acceptAgreement.addEventListener('change', () => {
+      updateSubmitState();
+    });
 
     toggleTaxFields();  // initialize on load
 
@@ -75,6 +102,7 @@
       const role = roleSelect.value;
       const gst_number = gstInput.value.trim();
       const pan_number = panInput.value.trim();
+      const agreementAccepted = acceptAgreement.checked;
 
       if (password.length < 6) {
         messageDiv.textContent = "Password must be at least 6 characters.";
@@ -93,14 +121,20 @@
           messageDiv.className = 'error';
           return;
         }
+        if (!agreementAccepted) {
+          messageDiv.textContent = "You must accept the Seller Agreement & Policies.";
+          messageDiv.className = 'error';
+          return;
+        }
       }
 
       try {
         messageDiv.textContent = "Creating account, please wait...";
+        messageDiv.className = '';
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
 
-        // Insert profile row
+        // Insert profile row with agreement acceptance flag
         await supabase.from('profiles').insert([{
           id: data.user.id,
           name,
@@ -108,10 +142,11 @@
           role,
           gst_number: role === 'seller' ? gst_number : null,
           pan_number: role === 'seller' ? pan_number : null,
+          agreement_accepted: role === 'seller' ? true : null,
           created_at: new Date()
         }]);
 
-        messageDiv.textContent = "Signup successful! Please check your email (including spam) for a verification link before logging in.";
+        messageDiv.textContent = "Signup successful! Please check your email for a verification link.";
         messageDiv.className = 'success';
         setTimeout(() => { window.location.href = 'login.html'; }, 4500);
       } catch (err) {
@@ -119,7 +154,7 @@
         messageDiv.className = 'error';
       }
     };
-  }
+  };
 </script>
 </body>
 </html>

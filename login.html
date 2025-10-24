@@ -142,26 +142,33 @@
     window.addEventListener('hashchange', showResetFormIfNeeded);
 
     // 4. Handle password reset form submission
-    document.getElementById('reset-form').onsubmit = async function(e) {
-      e.preventDefault();
-      const newPassword = document.getElementById('new-password').value;
-      const msg = document.getElementById('reset-message');
-      msg.textContent = "Updating password...";
-      msg.className = "";
-      // Wait until Supabase recognizes PASSWORD_RECOVERY mode
-      supabase.auth.onAuthStateChange(async (event) => {
-        if (event === "PASSWORD_RECOVERY" || window.location.hash.includes("access_token")) {
-          const { error } = await supabase.auth.updateUser({ password: newPassword });
-          if (error) {
-            msg.textContent = "Error: " + error.message;
-            msg.className = "error";
-          } else {
-            msg.textContent = "Password updated! You can now log in with your new password.";
-            msg.className = "success";
-          }
-        }
-      });
-    };
+  document.getElementById('reset-form').onsubmit = async function(e) {
+  e.preventDefault();
+  const newPassword = document.getElementById('new-password').value;
+  const msg = document.getElementById('reset-message');
+  msg.textContent = "Updating password...";
+  msg.className = "";
+
+  // This processes the session from URL so updateUser works
+  const { data, error } = await supabase.auth.getSessionFromUrl({
+    storeSession: true
+  });
+
+  if (!error) {
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    if (updateError) {
+      msg.textContent = "Error: " + updateError.message;
+      msg.className = "error";
+    } else {
+      msg.textContent = "Password updated! You can now log in with your new password.";
+      msg.className = "success";
+    }
+  } else {
+    msg.textContent = "Session error: " + error.message;
+    msg.className = "error";
+  }
+};
+
   };
 </script>
 </body>

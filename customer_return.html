@@ -2,62 +2,193 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Request a Return - MyShop</title>
+  <title>My Orders: Cancel or Return</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body { max-width: 900px; margin: 2rem auto; background: #fafafa; font-family: Arial, sans-serif; padding: 1rem; }
-    h1 { color: #222; margin-bottom: 1rem; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
-    th, td { border: 1px solid #ddd; padding: 10px; font-size: 0.95rem; }
-    th { background: #e6f0ff; color: #0070f3; font-weight: 600; }
-    textarea { width: 100%; height: 50px; resize: vertical; font-family: Arial, sans-serif; font-size: 0.9rem; padding: 6px; border-radius: 5px; border: 1px solid #ccc; }
-    textarea:disabled { background: #eee; }
-    button { background: #0070f3; color: white; border: none; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem; margin: 1rem auto 0; display: block; transition: background 0.3s ease; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
-    #msg { text-align: center; font-weight: 700; margin-top: 1rem; }
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f6f8f9;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 1040px;
+      margin: 32px auto 0 auto;
+      padding: 0 1.3rem 2rem 1.3rem;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 18px;
+      color: #232f3e;
+      text-align: left;
+    }
+    .order-list {
+      display: flex;
+      flex-direction: column;
+      gap: 25px;
+    }
+    .order-card {
+      background: #fff;
+      border: 1px solid #e3e7ed;
+      border-radius: 13px;
+      padding: 18px 28px 18px 20px;
+      box-shadow: 0 2px 18px 0 rgba(144,170,203,0.10);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+      align-items: flex-start;
+      transition: box-shadow 0.14s;
+    }
+    .order-card:hover {
+      box-shadow: 0 6px 26px 0 rgba(60,100,180,0.11);
+    }
+
+    .order-info {
+      flex: 1 1 290px;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+    .product-img {
+      width: 78px;
+      height: 78px;
+      object-fit: contain;
+      border-radius: 10px;
+      border: 1px solid #e3e7ed;
+      background: #fafbfc;
+      margin-right: 10px;
+    }
+    .details {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .product-title {
+      font-size: 1.14rem;
+      color: #232f3e;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .tiny {
+      color: #627089;
+      font-size: 0.96rem;
+      margin-bottom: 1px;
+    }
+    .quantity {
+      color: #105c38;
+      font-size: 0.97rem;
+      font-weight: 600;
+    }
+    .status-badge, .badger {
+      display: inline-block;
+      font-size: 0.96rem;
+      font-weight: 600;
+      padding: 3.5px 13px;
+      border-radius: 13px;
+      margin-right: 6px;
+      color: #fff;
+    }
+    .delivered { background: #27ae60; }
+    .pending { background: #e2a000; }
+    .dispatched { background: #1484d6; }
+    .cancelled, .returned { background: #bb2222; }
+    .shipped { background: #ce9101; color: #111; }
+    .default-badge { background: #a2afc0; }
+
+    .order-actions {
+      flex: 1 1 220px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      min-width: 185px;
+    }
+    textarea {
+      margin-bottom: 7px;
+      width: 100%;
+      border-radius: 7px;
+      border: 1px solid #dae0eb;
+      min-height: 39px;
+      font-size: 1rem;
+      padding: 8px;
+      background: #fafcfa;
+      transition: border-color 0.14s;
+    }
+    textarea:focus { border-color: #0070f3; }
+
+    .action-btn {
+      background: linear-gradient(90deg, #fa7517 40%, #FFD600 100%);
+      color: #232f3e;
+      font-weight: 700;
+      font-size: 1.07rem;
+      padding: 9px 22px;
+      border-radius: 17px;
+      border: none;
+      box-shadow: 0 1px 7px #ff900017;
+      cursor: pointer;
+      transition: background 0.18s, color 0.16s;
+      margin-bottom: 2.5px;
+    }
+    .action-btn:disabled {
+      background: #ececec;
+      color: #999;
+      cursor: not-allowed;
+    }
+    .cancel-btn {
+      background: linear-gradient(90deg, #ff4e2c 60%, #fa8c16 100%);
+      color: #fff;
+    }
+    .action-box span {
+      font-weight: 700;
+      color: #27ae60;
+      font-size: 1.04rem;
+      margin: 4px 0;
+      display: block;
+    }
+    @media (max-width: 680px){
+      .order-card { flex-direction: column; gap: 16px; padding: 15px 9px 13px 8px; }
+      .order-info, .order-actions { min-width: 0; }
+      .product-img { width: 44px; height:44px; margin-right:7px;}
+      h1 { font-size: 1.39rem; padding-top:13px; }
+    }
   </style>
 </head>
 <body>
-<h1>Request a Return</h1>
-<p>Only products from orders placed within the last 7 days are eligible.</p>
-
-<form id="returnForm">
-  <table>
-    <thead>
-    <tr>
-      <th>Select</th>
-      <th>Order ID</th>
-      <th>Product</th>
-      <th>Order Date</th>
-      <th>Qty</th>
-      <th>Reason</th>
-    </tr>
-    </thead>
-    <tbody id="orderItemsBody"></tbody>
-  </table>
-  <button id="submitReturnBtn" type="submit" disabled>Submit Return Request</button>
-</form>
-
-<div id="msg"></div>
+<div class="container">
+  <h1>My Orders</h1>
+  <div style="margin-bottom: 23px; color:#4d5e7e;">
+    <b>Return:</b> Only allowed within 3 days after delivery.<br>
+    <b>Cancel:</b> Only before the item is shipped.
+  </div>
+  <div id="msg" class="msg"></div>
+  <div class="order-list" id="orderItemsBody"></div>
+</div>
 
 <script>
-  const supabase = supabase.createClient(
+  const supabase = window.supabase.createClient(
     'https://wamqheltqmufuzrqlxlb.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
-   );
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
 
   const orderItemsBody = document.getElementById("orderItemsBody");
-  const submitBtn = document.getElementById("submitReturnBtn");
   const msg = document.getElementById("msg");
-  let selectedItems = new Map();
 
-  function updateSubmitButton() {
-    submitBtn.disabled = selectedItems.size === 0;
+  function statusBadge(status) {
+    const m = status ? status.toLowerCase() : "";
+    if (m === "delivered") return '<span class="status-badge delivered">Delivered</span>';
+    if (m === "pending") return '<span class="status-badge pending">Pending</span>';
+    if (m === "returned") return '<span class="status-badge returned">Returned</span>';
+    if (m === "cancelled") return '<span class="status-badge cancelled">Cancelled</span>';
+    if (m === "shipped") return '<span class="status-badge shipped">Shipped</span>';
+    if (m === "dispatched") return '<span class="status-badge dispatched">Dispatched</span>';
+    return `<span class="status-badge default-badge">${status ? status : "Unknown"}</span>`;
   }
 
   async function loadOrderItems() {
-    msg.textContent = "Loading your recent order items...";
+    msg.textContent = "Loading your orders...";
+    orderItemsBody.innerHTML = "";
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
@@ -66,124 +197,146 @@
       return;
     }
     const customerId = user.id;
-    const sevenDaysAgoISO = new Date(Date.now() - 7*24*60*60*1000).toISOString();
 
-    // 1. Get orders for customer in last 7 days
     const { data: orders, error: ordersError } = await supabase
       .from('orders')
       .select('id, created_at')
       .eq('customer_id', customerId)
-      .gte('created_at', sevenDaysAgoISO);
+      .order('created_at', { ascending: false });
 
-    if (ordersError) {
-      msg.textContent = "Failed to load orders: " + ordersError.message;
+    if (ordersError || !orders.length) {
+      msg.textContent = "No orders found.";
       msg.style.color = "red";
       return;
     }
+    const orderIds = orders.map(o => o.id);
 
-    const orderIds = orders ? orders.map(o => o.id) : [];
+    const { data: items, error: oiError } = await supabase
+      .from('order_items')
+      .select(`
+        id,
+        order_id,
+        product_id,
+        quantity,
+        price,
+        returned,
+        delivery_status,
+        status,
+        products:product_id(name, image_url),
+        orders:order_id(created_at)
+      `)
+      .in('order_id', orderIds)
+      .order('order_id', { ascending: false });
 
-    // 2. Get order_items for those orders that are NOT returned
-    let orderItems = [];
-    if (orderIds.length) {
-      const { data: items, error: oiError } = await supabase
-        .from('order_items')
-        .select('id, order_id, quantity, returned, products(name), orders(created_at)')
-        .in('order_id', orderIds)
-        .eq('returned', false)
-        .order('order_id', { ascending: false });
-
-      if (oiError) {
-        msg.textContent = "Failed to load order items: " + oiError.message;
-        msg.style.color = "red";
-        return;
-      }
-      orderItems = items;
-    }
-
-    if (!orderItems.length) {
-      orderItemsBody.innerHTML = `<tr><td colspan="6" style="text-align:center;">No eligible order items found.</td></tr>`;
+    if (oiError || !items.length) {
+      orderItemsBody.innerHTML = `<div style="color:#666;font-size:1.1rem;margin:23px 8px;">No order items found.</div>`;
       msg.textContent = "";
-      submitBtn.disabled = true;
       return;
     }
 
     msg.textContent = "";
-    orderItemsBody.innerHTML = "";
+    const today = new Date();
 
-    orderItems.forEach(item => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><input type="checkbox" data-item-id="${item.id}" /></td>
-        <td>${item.order_id}</td>
-        <td>${item.products.name}</td>
-        <td>${item.orders.created_at ? new Date(item.orders.created_at).toLocaleDateString() : ''}</td>
-        <td>${item.quantity}</td>
-        <td><textarea disabled placeholder="Enter reason for return"></textarea></td>
+    items.forEach(item => {
+      // For product image (if available) else use a placeholder
+      const imgSrc = item.products?.image_url || "https://via.placeholder.com/70x70.png?text=Product";
+
+      const delivered = item.delivery_status === "delivered";
+      const deliveredAt = item.orders?.created_at ? new Date(item.orders.created_at) : null; // Use delivered_at if you track per-item!
+      const daysSinceDelivered = deliveredAt ? Math.floor((today - deliveredAt) / (1000 * 60 * 60 * 24)) : null;
+      const withinReturnWindow = delivered && deliveredAt && (daysSinceDelivered <= 3);
+
+      const canCancel = !["shipped", "couriered", "dispatched", "delivered"].includes(item.delivery_status) && !item.returned && (item.status !== "cancelled");
+      const canReturn = delivered && withinReturnWindow && !item.returned && (item.status !== "cancelled");
+
+      const card = document.createElement("div");
+      card.className = "order-card";
+
+      card.innerHTML = `
+        <div class="order-info">
+          <img src="${imgSrc}" class="product-img" alt="Product"/>
+          <div class="details">
+            <div class="product-title">${item.products?.name || "Product"}</div>
+            <div class="tiny">Order #${item.order_id}</div>
+            <div class="tiny">Ordered on ${item.orders?.created_at ? new Date(item.orders.created_at).toLocaleDateString() : '-'}</div>
+            <div class="quantity">Qty: ${item.quantity}</div>
+            <div style="margin-top:7px;">${statusBadge(item.delivery_status)}${item.returned ? '<span class="badger returned">Returned</span>' : ""}${item.status === "cancelled" ? '<span class="badger cancelled">Cancelled</span>': ""}</div>
+          </div>
+        </div>
+        <div class="order-actions action-box">
+          ${canCancel ? `<button class="action-btn cancel-btn">Cancel</button>` : ""}
+          ${canReturn ? `
+            <textarea placeholder="Reason for return (min 5 chars)"></textarea>
+            <button class="action-btn return-btn">Return</button>
+          ` : item.returned ? `<span>Already Returned</span>` : ""}
+        </div>
       `;
-      orderItemsBody.appendChild(tr);
 
-      const checkbox = tr.querySelector('input[type="checkbox"]');
-      const textarea = tr.querySelector('textarea');
-
-      checkbox.addEventListener('change', () => {
-        if (checkbox.checked) {
-          textarea.disabled = false;
-          selectedItems.set(item.id, { id: item.id, quantity: item.quantity, reason: '' });
-        } else {
-          textarea.disabled = true;
-          textarea.value = '';
-          selectedItems.delete(item.id);
-        }
-        updateSubmitButton();
-      });
-
-      textarea.addEventListener('input', () => {
-        if (selectedItems.has(item.id)) {
-          selectedItems.get(item.id).reason = textarea.value.trim();
-        }
-      });
+      // Cancel Handler
+      if (canCancel) {
+        card.querySelector('.cancel-btn').onclick = async function() {
+          if (!confirm("Are you sure you want to cancel this item?")) return;
+          this.disabled = true;
+          msg.textContent = "";
+          const { error } = await supabase
+            .from('order_items')
+            .update({ status: "cancelled" })
+            .eq('id', item.id);
+          if (!error) {
+            msg.style.color = "green";
+            msg.textContent = "Order item cancelled successfully!";
+            loadOrderItems();
+          } else {
+            msg.style.color = "red";
+            msg.textContent = "Failed to cancel: " + error.message;
+            this.disabled = false;
+          }
+        };
+      }
+      // Return Handler
+      if (canReturn) {
+        const reasonTextarea = card.querySelector('textarea');
+        const returnBtn = card.querySelector('.return-btn');
+        returnBtn.onclick = async function() {
+          msg.textContent = "";
+          const reason = reasonTextarea.value.trim();
+          if (!reason || reason.length < 5) {
+            msg.textContent = "Please enter a reason of at least 5 characters for return.";
+            msg.style.color = "red";
+            reasonTextarea.focus();
+            return;
+          }
+          returnBtn.disabled = true;
+          // Insert to returns table (create if needed)
+          const { error: insError } = await supabase.from('returns').insert([{
+            order_item_id: item.id,
+            quantity: item.quantity,
+            reason,
+            created_at: new Date().toISOString()
+          }]);
+          if (insError) {
+            msg.style.color = "red";
+            msg.textContent = "Failed to submit return: " + insError.message;
+            returnBtn.disabled = false;
+            return;
+          }
+          // Mark as returned
+          const { error: upError } = await supabase.from('order_items').update({ returned: true }).eq('id', item.id);
+          if (upError) {
+            msg.style.color = "red";
+            msg.textContent = "Failed to update: " + upError.message;
+            returnBtn.disabled = false;
+            return;
+          }
+          msg.style.color = "green";
+          msg.textContent = "Return request submitted successfully!";
+          loadOrderItems();
+        };
+      }
+      orderItemsBody.appendChild(card);
     });
   }
 
-  document.getElementById('returnForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    msg.textContent = "";
-    if (selectedItems.size === 0) {
-      msg.textContent = "Select at least one item to return.";
-      msg.style.color = "red";
-      return;
-    }
-    for (const item of selectedItems.values()) {
-      if (!item.reason || item.reason.length < 5) {
-        msg.textContent = "Please provide a reason of at least 5 characters for all selected items.";
-        msg.style.color = "red";
-        return;
-      }
-    }
-    try {
-      for (const item of selectedItems.values()) {
-        let { error: insertError } = await supabase.from('returns').insert([{
-          order_item_id: item.id,
-          quantity: item.quantity,
-          reason: item.reason,
-          created_at: new Date().toISOString()
-        }]);
-        if (insertError) throw insertError;
-
-        const { error: updateError } = await supabase.from('order_items').update({ returned: true }).eq('id', item.id);
-        if (updateError) throw updateError;
-      }
-      msg.style.color = "green";
-      msg.textContent = "Return request submitted successfully.";
-      selectedItems.clear();
-      submitBtn.disabled = true;
-      loadOrderItems();
-    } catch (err) {
-      msg.style.color = "red";
-      msg.textContent = "Failed to submit returns: " + err.message;
-    }
-  });
   window.onload = loadOrderItems;
 </script>
 </body>

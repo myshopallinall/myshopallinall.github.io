@@ -154,18 +154,18 @@
    let codAcceptMap = {};
 
   async function checkLogin() {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
-      alert('Please login first!');
-      window.location.href = 'login.html';
-      return;
-    }
-    customerId = data.user.id;
-    await loadProducts();
-await loadOrders();
-loadCart();
-    loadOrders();
+  const { data } = await supabase.auth.getUser();
+  if (!data.user) {
+    alert('Please login first!');
+    window.location.href = 'login.html';
+    return;
   }
+  customerId = data.user.id;
+  await loadProducts();
+  await loadOrders();
+  loadCart();
+  loadOrders();
+}
 
   async function loadProducts() {
  async function loadOrders() {

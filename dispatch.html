@@ -2,78 +2,133 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Delivery Details - MyShop</title>
+  <title>Seller Order Management</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600&display=swap" rel="stylesheet"/>
   <style>
-    body { font-family: 'Montserrat', Arial, sans-serif; margin: 2rem; background: #f4f8fc; }
-    .modal-header { font-weight: bold; font-size: 22px; margin-bottom: 10px;}
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 2rem; background: #f4f8fc; }
+    h1 { color: #0070f3; margin-bottom: 1.5rem;}
     table { width: 100%; border-collapse: collapse; box-shadow: 0 1px 6px #ccc; background: white;}
-    th, td { padding: 10px; border: 1px solid #ddd;}
+    th, td { padding: 10px; border: 1px solid #ddd; text-align: left;}
     th { background: #eef5ff;}
-    .prod-status-ind { padding:2px 8px; border-radius:5px; margin-right:3px; font-size:0.98em;}
-    .prod-status-placed{background:#bfc3cb;color:#444;}
-    .prod-status-shipped{background:#6c63ff;color:#fff;}
-    .prod-status-couriered{background:#b24d98;color:#fff;}
-    .prod-status-dispatched{background:#2bc26b;color:#fff;}
-    .prod-status-delivered{background:#219f43;color:#fff;}
-    .btn-payment-status { background: #ff9900; color: #fff; padding: 4px 12px; border: 0; border-radius: 3px;}
-    .paid-badge { background: #16a34a; color: #fff; padding: 2px 8px; border-radius: 4px;}
-    .cod-badge { background: #ffe600; color: #444; padding: 2px 8px; border-radius: 4px;}
+    button { padding: 6px 13px; margin: 2px 2px 2px 0; border: none; border-radius: 5px; color: white; cursor: pointer;}
+    .btn-delivery-info { background: #4568ea;}
+    .btn-invoice { background: #f9a825;}
+    .delivery-status-badge { padding: 2px 11px; border-radius: 11px; color: #fff; font-weight: bold; font-size: 0.99em; }
+    .status-delivered { background: #219f43;}
+    .status-cancelled { background: #d82c27 !important; color: #fff !important; }
+    .pending-badge { background: #e67e22;}
+    .paid-badge { background: #007d37;}
+    .cancelled-row td { background: #ffe9ea; }
   </style>
 </head>
 <body>
-<div class="modal-header">Delivery Details</div>
-<div id="delivery-details"></div>
+<h1>Seller Order Management</h1>
+<table id="orders-table">
+  <thead>
+  <tr>
+    <th>Order ID</th>
+    <th>Customer</th>
+    <th>Status</th>
+    <th>Created At</th>
+    <th>HSN Code(s)</th>
+    <th>Actions</th>
+  </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  const supabase = window.supabase.createClient('https://wamqheltqmufuzrqlxlb.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY');
-  const DELIVERY_STATUSES = ["placed","shipped","couriered","dispatched","delivered"];
-  async function loadDeliveryDetails() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const orderId = urlParams.get('order_id');
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  async function loadSellerOrders() {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { alert('Please login first!'); window.location.href='login.html'; return;}
-    const { data: order, error } = await supabase.from('orders')
+    if (!user) {
+      alert('Please login first!');
+      window.location.href = 'login.html';
+      return;
+    }
+    const { data: orders, error } = await supabase.from('orders')
       .select(`
-        id,total,status,created_at,profiles:customer_id(name,email,phone,address),
-        order_items(id,product_id,quantity,price,delivery_status,cod_payment_status,is_cod,hsn_code,
-          courier_name,courier_tracking_number,courier_tracking_url,
-          products(name),profiles_seller:seller_id(id)
-          )
-      `).eq('id', orderId).maybeSingle();
-    if (error || !order) {document.getElementById('delivery-details').innerText="Order not found or error!";return;}
-    const itemsMine = order.order_items.filter(item=>item.profiles_seller && item.profiles_seller.id === user.id);
-    let html = `<div><strong>Order ID:</strong> ${order.id}</div>
-      <div><strong>Date:</strong> ${new Date(order.created_at).toLocaleString()}</div>
-      <div><strong>Customer Name:</strong> ${order.profiles.name}</div>
-      <div><strong>Email:</strong> ${order.profiles.email}</div>
-      <div><strong>Phone:</strong> ${order.profiles.phone}</div>
-      <div><strong>Address:</strong> ${order.profiles.address || "-"}
-      <hr><table><thead>
-        <tr><th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th><th>Total</th>
-        <th>Delivery Status</th><th>COD Payment</th><th>Tracking Info</th></tr></thead><tbody>`;
-    itemsMine.forEach(item=>{
-      let prodStatusClass = "prod-status-ind " + (DELIVERY_STATUSES.includes(item.delivery_status) ? ("prod-status-" + item.delivery_status) : "prod-status-pending");
-      let paymentCell = item.is_cod ? (
-          item.cod_payment_status==='paid'
-          ? '<span class="paid-badge">COD Paid</span>'
-          : '<span class="cod-badge">COD Pending</span>'
-        ) : '<span class="cod-badge">Not COD</span>';
-      let trackingHtml = "-";
-      if(item.courier_tracking_number){trackingHtml = `${item.courier_name || ''}<br>${item.courier_tracking_number}`;}
-      html+=`<tr>
-        <td>${item.products.name}</td><td>${item.hsn_code||"-"}</td>
-        <td>${item.quantity}</td><td>₹${item.price}</td><td>₹${item.price*item.quantity}</td>
-        <td><span class="${prodStatusClass}">${(item.delivery_status || "pending").toUpperCase()}</span></td>
-        <td>${paymentCell}</td>
-        <td>${trackingHtml}</td>
-      </tr>`;
+        id,
+        customer_id,
+        created_at,
+        profiles:customer_id(name),
+        order_items(
+          id,
+          hsn_code,
+          status,
+          delivery_status,
+          profiles_seller: seller_id(id)
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) return;
+
+    // Only show seller's own items
+    const sellerOrders = orders.filter(order =>
+      order.order_items.some(item =>
+        item.profiles_seller && item.profiles_seller.id === user.id
+      )
+    );
+    const tbody = document.querySelector('#orders-table tbody');
+    tbody.innerHTML = '';
+
+    sellerOrders.forEach(order => {
+      const itemsForSeller = order.order_items.filter(
+        item => item.profiles_seller && item.profiles_seller.id === user.id
+      );
+      // If ALL items for seller are cancelled, hide the delivery button
+      const allCancelled = itemsForSeller.length > 0 &&
+        itemsForSeller.every(item =>
+          (item.delivery_status === "cancelled" || item.status === "cancelled")
+        );
+
+      const itemCodes = itemsForSeller.map(item => item.hsn_code || '-').join(', ');
+      // For status, show as cancelled if all are cancelled, else show delivered or pending
+      let mainStatus = "pending";
+      if (allCancelled) mainStatus = "cancelled";
+      else if (itemsForSeller.every(i => i.delivery_status === "delivered")) mainStatus = "delivered";
+      // Badge
+      let statusHtml = `<span class="delivery-status-badge status-${mainStatus}">${mainStatus.charAt(0).toUpperCase()+mainStatus.slice(1)}</span>`;
+
+      let tr = document.createElement('tr');
+      if (allCancelled) tr.classList.add("cancelled-row");
+      tr.innerHTML = `
+        <td>${order.id}</td>
+        <td>${order.profiles.name}</td>
+        <td>${statusHtml}</td>
+        <td>${new Date(order.created_at).toLocaleString()}</td>
+        <td>${itemCodes}</td>
+        <td></td>
+      `;
+
+      tbody.appendChild(tr);
+      const actionTd = tr.querySelector('td:last-child');
+
+      // Only show Delivery Details if NOT all cancelled
+      if (!allCancelled) {
+        const deliveryBtn = document.createElement('button');
+        deliveryBtn.className = 'btn-delivery-info';
+        deliveryBtn.textContent = 'Delivery Details';
+        deliveryBtn.onclick = () => alert('Show Delivery Details Modal');
+        actionTd.appendChild(deliveryBtn);
+      }
+
+      // You may add always-visible Invoice button or similar actions here.
+      const invoiceBtn = document.createElement('button');
+      invoiceBtn.className = 'btn-invoice';
+      invoiceBtn.textContent = 'Invoice';
+      invoiceBtn.onclick = () => alert('Show Invoice Modal');
+      actionTd.appendChild(invoiceBtn);
     });
-    html+=`</tbody></table>`;
-    document.getElementById('delivery-details').innerHTML = html;
   }
-  window.onload=loadDeliveryDetails;
+
+  window.onload = loadSellerOrders;
 </script>
 </body>
 </html>

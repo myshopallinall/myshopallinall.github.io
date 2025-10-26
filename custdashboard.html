@@ -4,9 +4,10 @@
   <meta charset="UTF-8" />
   <title>Customer Dashboard - MyShop</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
+    /* Your CSS styles here, unchanged */
     :root {
       --primary: #fbb034;
       --secondary: #232f3e;
@@ -417,8 +418,11 @@
       <h2>Latest Products</h2>
       <div class="search-sort-wrap">
         <input class="search-bar" id="searchInput" type="text" placeholder="Search products..." oninput="renderProducts()" />
-        <select class="sort-select" id="categorySelect" onchange="renderProducts()">
+        <select class="sort-select" id="categorySelect" onchange="onCategoryChange()">
           <option value="">All Categories</option>
+        </select>
+        <select class="sort-select" id="subCategorySelect" onchange="renderProducts()" disabled>
+          <option value="">Select Subcategory</option>
         </select>
         <select class="sort-select" id="sellerSelect" onchange="renderProducts()">
           <option value="">All Sellers</option>
@@ -438,17 +442,6 @@
   </div>
 </main>
 
-<!-- Image Viewer Modal -->
-<div class="image-modal" id="imageModal">
-  <button class="modal-close" onclick="closeImageModal()">&times;</button>
-  <button class="modal-nav prev" onclick="prevImage()">&#8249;</button>
-  <button class="modal-nav next" onclick="nextImage()">&#8250;</button>
-  <div class="modal-content">
-    <img class="modal-main-image" id="modalMainImage" src="" alt="Product Image" />
-    <div class="modal-thumbnails" id="modalThumbnails"></div>
-  </div>
-</div>
-
 <script>
   const supabase = window.supabase.createClient(
     'https://wamqheltqmufuzrqlxlb.supabase.co',
@@ -457,10 +450,10 @@
 
   let customerId = null;
   let allProducts = [];
-  let currentImages = [];
-  let currentImageIndex = 0;
-
-  loadProducts(); // Load products directly for all users
+  let allCategories = [];
+document.addEventListener('DOMContentLoaded', () => {
+loadProducts();
+});
 
   async function checkLogin() {
     const { data } = await supabase.auth.getUser();
@@ -468,33 +461,45 @@
   }
 
   async function loadProducts() {
-    await checkLogin();
-    const { data, error } = await supabase
-      .from('products')
-      .select('id,name,description,price,stock,category,image_url,accept_cod,seller_id,profiles(name)')
-      .order('id', { ascending: false });
+  const { data, error } = await supabase
+    .from('products')
+    .select('id, name, description, price, stock, category_id, image_url, accept_cod, seller_id, profiles(name)')
+    .order('created_at', { ascending: false });
 
-    if (error) {
-      allProducts = [];
-      renderProducts();
-      return;
-    }
-    allProducts = data || [];
-    populateCategories();
+  if (error) {
+    alert('Error loading products: ' + error.message);
+    return;
+  }
+  allProducts = data || [];
+    await loadCategories();
+    await checkLogin();
     populateSellers();
     renderProducts();
   }
 
-  function populateCategories() {
-    const cats = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
+  async function loadCategories() {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('id, name, parent_id');
+    if (error) {
+      alert('Error fetching categories: ' + error.message);
+      return;
+    }
+    allCategories = data;
+
     const categorySelect = document.getElementById('categorySelect');
     categorySelect.innerHTML = '<option value="">All Categories</option>';
-    cats.forEach(cat => {
-      const o = document.createElement('option');
-      o.value = cat;
-      o.textContent = cat;
-      categorySelect.appendChild(o);
+
+    const topCategories = allCategories.filter(c => c.parent_id === null);
+    topCategories.forEach(cat => {
+      const opt = document.createElement('option');
+      opt.value = cat.id;
+      opt.textContent = cat.name;
+      categorySelect.appendChild(opt);
     });
+
+    document.getElementById('subCategorySelect').innerHTML = '<option value="">Select Subcategory</option>';
+    document.getElementById('subCategorySelect').disabled = true;
   }
 
   function populateSellers() {
@@ -510,16 +515,40 @@
     });
   }
 
+  function onCategoryChange() {
+    const categorySelect = document.getElementById('categorySelect');
+    const selectedCatId = parseInt(categorySelect.value);
+    const subCatSelect = document.getElementById('subCategorySelect');
+    subCatSelect.innerHTML = '<option value="">Select Subcategory</option>';
+    subCatSelect.disabled = true;
+    if (!selectedCatId) {
+      renderProducts();
+      return;
+    }
+    const subcategories = allCategories.filter(c => c.parent_id === selectedCatId);
+    if (subcategories.length) {
+      subCatSelect.disabled = false;
+      subcategories.forEach(subcat => {
+        const opt = document.createElement('option');
+        opt.value = subcat.id;
+        opt.textContent = subcat.name;
+        subCatSelect.appendChild(opt);
+      });
+    }
+    renderProducts();
+  }
+
   window.renderProducts = function() {
     const searchText = document.getElementById('searchInput').value.toLowerCase();
-    const categoryFilter = document.getElementById('categorySelect').value;
+    const categoryFilter = parseInt(document.getElementById('categorySelect').value);
+    const subcategoryFilter = parseInt(document.getElementById('subCategorySelect').value);
     const sellerFilter = document.getElementById('sellerSelect').value;
     const sortBy = document.getElementById('sortSelect').value;
 
     let filtered = allProducts.filter(p => {
       const nameMatch = p.name?.toLowerCase().includes(searchText) || false;
       const descMatch = p.description?.toLowerCase().includes(searchText) || false;
-      const catMatch = categoryFilter === '' || p.category === categoryFilter;
+      const catMatch = !categoryFilter || (subcategoryFilter ? p.category_id === subcategoryFilter : p.category_id === categoryFilter);
       const sellerMatch = sellerFilter === '' || p.seller_id === sellerFilter;
       return (nameMatch || descMatch) && catMatch && sellerMatch;
     });
@@ -528,8 +557,16 @@
     else if (sortBy === 'name_desc') filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
     else if (sortBy === 'price_asc') filtered.sort((a, b) => (a.price || 0) - (b.price || 0));
     else if (sortBy === 'price_desc') filtered.sort((a, b) => (b.price || 0) - (a.price || 0));
-    else if (sortBy === 'category_asc') filtered.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
-    else if (sortBy === 'category_desc') filtered.sort((a, b) => (b.category || '').localeCompare(a.category || ''));
+    else if (sortBy === 'category_asc') filtered.sort((a, b) => {
+      const catA = allCategories.find(c => c.id === a.category_id)?.name ?? '';
+      const catB = allCategories.find(c => c.id === b.category_id)?.name ?? '';
+      return catA.localeCompare(catB);
+    });
+    else if (sortBy === 'category_desc') filtered.sort((a, b) => {
+      const catA = allCategories.find(c => c.id === a.category_id)?.name ?? '';
+      const catB = allCategories.find(c => c.id === b.category_id)?.name ?? '';
+      return catB.localeCompare(catA);
+    });
 
     const container = document.getElementById('products-list');
     container.innerHTML = '';
@@ -551,10 +588,13 @@
       div.className = 'product-card' + (isFeatured ? ' featured' : '');
       div.tabIndex = 0;
       div.innerHTML = `
-        <div class="product-img-wrap" onclick='openImageModal(${JSON.stringify(images)})'>
+   <div class="product-img-wrap" onclick="window.location.href='productdesc.html?id=${prod.id}'">
+
           <img src="${images[0]}" alt="${prod.name || ''}" />
         </div>
-        <div class="product-name">${prod.name || '-'}</div>
+        <div class="product-name" style="cursor:pointer; text-decoration:underline;" onclick="window.location.href='productdesc.html?id=${prod.id}'">
+          ${prod.name || '-'}
+        </div>
         <div class="product-price">₹${prod.price ?? '-'}</div>
         <div class="product-seller">Seller: ${prod.profiles?.name || 'N/A'}</div>
         <span class="stock-label${isOutStock ? ' out' : ''}">
@@ -567,7 +607,6 @@
       container.appendChild(div);
     });
   };
-
   // --- Image Modal Logic ---
   window.openImageModal = function(images) {
     currentImages = images;

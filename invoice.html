@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Invoice - MyShop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600&display=swap" rel="stylesheet"/>
+  <style>
+    body { font-family: 'Montserrat', Arial, sans-serif; margin: 2rem; background: #f4f8fc; }
+    .header { font-weight: bold; font-size: 24px; margin-bottom: 10px;}
+    table { width: 100%; border-collapse: collapse; box-shadow: 0 1px 6px #ccc; background: white;}
+    th, td { padding: 10px; border: 1px solid #ddd;}
+    th { background: #eef5ff;}
+    .prod-status-ind { padding:2px 8px; border-radius:5px; margin-right:3px; font-size:0.98em;}
+    .prod-status-placed{background:#bfc3cb;color:#444;}
+    .prod-status-shipped{background:#6c63ff;color:#fff;}
+    .prod-status-couriered{background:#b24d98;color:#fff;}
+    .prod-status-dispatched{background:#2bc26b;color:#fff;}
+    .prod-status-delivered{background:#219f43;color:#fff;}
+    .paid-badge { background: #007d37; color: #fff; border-radius: 4px; padding: 3px 12px;}
+    .cod-badge { background: #ffe600; color: #444; border-radius: 4px; padding: 3px 12px;}
+  </style>
+</head>
+<body>
+<div class="header">Invoice Details</div>
+<div id="invoice-details"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient('https://wamqheltqmufuzrqlxlb.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY');
+  const DELIVERY_STATUSES = ["placed","shipped","couriered","dispatched","delivered"];
+  async function loadInvoiceDetails() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const orderId = urlParams.get('order_id');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { alert('Please login first!'); window.location.href='login.html'; return;}
+    const { data: order, error } = await supabase.from('orders')
+      .select(`
+        id,total,status,created_at,profiles:customer_id(name,email,phone,address),
+        order_items(id,product_id,quantity,price,delivery_status,cod_payment_status,is_cod,hsn_code,
+          courier_name,courier_tracking_number,courier_tracking_url,
+          products(name),profiles_seller:seller_id(id,name,email,address,gst_number,pan_number)
+        )
+      `).eq('id', orderId).maybeSingle();
+    if (error || !order) {document.getElementById('invoice-details').innerText="Order not found or error!";return;}
+    const itemsMine = order.order_items.filter(item=>item.profiles_seller && item.profiles_seller.id === user.id);
+    const sellerInfo = itemsMine[0]?.profiles_seller || {};
+    let html = `<h2>Invoice #${order.id}</h2>
+      <h3>Status: ${(order.status === 'delivered') ? '<span style="color:green;font-weight:bold;">Delivered & Paid</span>' : order.status.charAt(0).toUpperCase() + order.status.slice(1)}</h3>
+      <h3>Date: ${new Date(order.created_at).toLocaleString()}</h3>
+      <hr>
+      <h4>Seller Info</h4>
+      <div>Name: ${sellerInfo.name || '-'}</div>
+      <div>Email: ${sellerInfo.email || '-'}</div>
+      <div>Address: ${sellerInfo.address || '-'}</div>
+      <div>GST: ${sellerInfo.gst_number || '-'}</div>
+      <div>PAN: ${sellerInfo.pan_number || '-'}</div>
+      <hr>
+      <h4>Customer Info</h4>
+      <div>Name: ${order.profiles.name || '-'}</div>
+      <div>Email: ${order.profiles.email || '-'}</div>
+      <div>Phone: ${order.profiles.phone || '-'}</div>
+      <div>Address: ${order.profiles.address || '-'}</div>
+      <hr>
+      <table><thead>
+        <tr>
+          <th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th>
+          <th>Total</th><th>Delivery Status</th><th>Payment (COD)</th><th>Tracking Info</th>
+        </tr></thead><tbody>`;
+    itemsMine.forEach(item=>{
+      let prodStatusClass = "prod-status-ind " + (DELIVERY_STATUSES.includes(item.delivery_status) ? ("prod-status-" + item.delivery_status) : "prod-status-pending");
+      let paymentBadge = (item.is_cod) ? (
+        item.cod_payment_status==="paid"
+          ? '<span class="paid-badge">COD Paid</span>'
+          : '<span class="cod-badge">COD Pending</span>'
+      ) : '<span class="cod-badge">Not COD</span>';
+      let trackingHtml = item.courier_tracking_number ? `${item.courier_name||''}<br>${item.courier_tracking_number}` : "-";
+      html += `<tr>
+        <td>${item.products.name}</td><td>${item.hsn_code||"-"}</td>
+        <td>${item.quantity}</td><td>₹${item.price}</td>
+        <td>₹${item.price*item.quantity}</td>
+        <td><span class="${prodStatusClass}">${(item.delivery_status||"pending").toUpperCase()}</span></td>
+        <td>${paymentBadge}</td>
+        <td>${trackingHtml}</td>
+        </tr>`;
+    });
+    const total = itemsMine.reduce((sum,i)=>sum+i.price*i.quantity,0);
+    html+=`</tbody></table><hr><h3>Total: ₹${total}</h3>`;
+    document.getElementById('invoice-details').innerHTML=html;
+  }
+  window.onload=loadInvoiceDetails;
+</script>
+</body>
+</html>

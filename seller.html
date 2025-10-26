@@ -38,6 +38,17 @@
     #returns-list table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
     #returns-list th, #returns-list td { border: 1px solid #ddd; padding: 8px; text-align: left; }
     #returns-list th { background-color: #0070f3; color: white; }
+
+    /* Multiple Image Preview Styles */
+    .image-preview-container { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+    .image-preview-item { position: relative; width: 100px; height: 100px; border: 2px solid #ddd; border-radius: 5px; overflow: hidden; }
+    .image-preview-item img { width: 100%; height: 100%; object-fit: cover; }
+    .image-preview-item .remove-img { position: absolute; top: 2px; right: 2px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px; line-height: 20px; }
+    .image-preview-item .remove-img:hover { background: #c0392b; }
+    .image-preview-item .size-badge { position: absolute; bottom: 2px; left: 2px; background: rgba(0,0,0,0.7); color: white; font-size: 10px; padding: 2px 5px; border-radius: 3px; }
+    .product-images-gallery { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; }
+    .product-images-gallery img { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; }
+    .compression-info { font-size: 0.85rem; color: #666; margin-top: 5px; }
   </style>
 </head>
 <body>
@@ -58,7 +69,12 @@
   <input type="number" id="prod-price" placeholder="Price (₹)" required />
   <input type="number" id="prod-stock" placeholder="Stock (Qty)" min="0" required />
   <textarea id="prod-desc" placeholder="Description"></textarea>
-  <input type="file" id="prod-image-file" accept="image/*" />
+
+  <label for="prod-image-file" style="display:block; margin-top:10px; font-weight:bold;">Product Images (Max 5, auto-compressed to ~50KB)</label>
+  <input type="file" id="prod-image-file" accept="image/*" multiple />
+  <div class="compression-info" id="compression-info"></div>
+  <div id="image-preview-container" class="image-preview-container"></div>
+
   <div class="checkbox-row" style="margin:0.8rem 0;">
     <label class="option-label"><input type="checkbox" id="accept-cod" checked /> Accept COD</label>
     <label class="option-label"><input type="checkbox" id="accept-online" checked /> Accept Online Payment</label>
@@ -80,6 +96,9 @@
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
   );
   let sellerId = null;
+  let selectedFiles = [];
+  let existingImages = [];
+  let compressedFiles = []; // Store compressed blob/file objects
 
   async function getUser() {
     const { data } = await supabase.auth.getUser();
@@ -107,13 +126,161 @@
     }
   }
 
+  // Image Compression Function
+  async function compressImage(file, targetSizeKB = 50) {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+
+          // Start with original dimensions
+          let width = img.width;
+          let height = img.height;
+
+          // Resize if image is too large (max 800px on longest side)
+          const maxSize = 800;
+          if (width > maxSize || height > maxSize) {
+            if (width > height) {
+              height = (height / width) * maxSize;
+              width = maxSize;
+            } else {
+              width = (width / height) * maxSize;
+              height = maxSize;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Binary search for optimal quality
+          let quality = 0.9;
+          let blob = null;
+          let iterations = 0;
+          const maxIterations = 10;
+
+          const tryCompress = (q) => {
+            return new Promise((res) => {
+              canvas.toBlob((b) => {
+                res(b);
+              }, 'image/jpeg', q);
+            });
+          };
+
+          const compress = async () => {
+            while (iterations < maxIterations) {
+              blob = await tryCompress(quality);
+              const sizeKB = blob.size / 1024;
+
+              console.log(`Iteration ${iterations + 1}: Quality ${quality.toFixed(2)}, Size: ${sizeKB.toFixed(2)}KB`);
+
+              if (sizeKB <= targetSizeKB * 1.1 && sizeKB >= targetSizeKB * 0.8) {
+                // Within acceptable range (±10%)
+                break;
+              } else if (sizeKB > targetSizeKB) {
+                quality -= 0.1;
+              } else {
+                quality += 0.05;
+              }
+
+              quality = Math.max(0.1, Math.min(1, quality));
+              iterations++;
+            }
+
+            const finalFile = new File([blob], file.name, { type: 'image/jpeg' });
+            resolve({ file: finalFile, size: blob.size });
+          };
+
+          compress();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Handle file selection and compression
+  document.getElementById('prod-image-file').addEventListener('change', async function(e) {
+    const files = Array.from(e.target.files);
+    if (selectedFiles.length + files.length > 5) {
+      alert('You can upload maximum 5 images');
+      return;
+    }
+
+    const compressionInfo = document.getElementById('compression-info');
+    compressionInfo.textContent = 'Compressing images...';
+
+    for (const file of files) {
+      if (selectedFiles.length < 5) {
+        try {
+          const { file: compressedFile, size } = await compressImage(file, 50);
+          selectedFiles.push({ original: file, compressed: compressedFile, size });
+          console.log(`Original: ${(file.size / 1024).toFixed(2)}KB -> Compressed: ${(size / 1024).toFixed(2)}KB`);
+        } catch (error) {
+          console.error('Compression error:', error);
+          alert('Failed to compress image: ' + file.name);
+        }
+      }
+    }
+
+    compressionInfo.textContent = `${selectedFiles.length} image(s) compressed successfully!`;
+    setTimeout(() => { compressionInfo.textContent = ''; }, 3000);
+    renderImagePreviews();
+  });
+
+  function renderImagePreviews() {
+    const container = document.getElementById('image-preview-container');
+    container.innerHTML = '';
+
+    // Show existing images (in edit mode)
+    existingImages.forEach((url, index) => {
+      const div = document.createElement('div');
+      div.className = 'image-preview-item';
+      div.innerHTML = `
+        <img src="${url}" />
+        <button class="remove-img" type="button" onclick="removeExistingImage(${index})">&times;</button>
+      `;
+      container.appendChild(div);
+    });
+
+    // Show newly selected compressed files
+    selectedFiles.forEach((fileObj, index) => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const sizeKB = (fileObj.size / 1024).toFixed(1);
+        const div = document.createElement('div');
+        div.className = 'image-preview-item';
+        div.innerHTML = `
+          <img src="${e.target.result}" />
+          <span class="size-badge">${sizeKB}KB</span>
+          <button class="remove-img" type="button" onclick="removeSelectedFile(${index})">&times;</button>
+        `;
+        container.appendChild(div);
+      };
+      reader.readAsDataURL(fileObj.compressed);
+    });
+  }
+
+  window.removeSelectedFile = function(index) {
+    selectedFiles.splice(index, 1);
+    renderImagePreviews();
+  };
+
+  window.removeExistingImage = function(index) {
+    existingImages.splice(index, 1);
+    renderImagePreviews();
+  };
+
   async function uploadImage(file) {
-    const fileName = `${Date.now()}_${file.name}`;
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}_${file.name}`;
     let { error: uploadError } = await supabase.storage
       .from('product-images')
       .upload(fileName, file);
     if (uploadError) {
-      alert('Image upload failed: ' + uploadError.message);
+      console.error('Image upload failed:', uploadError.message);
       return null;
     }
     const { data: urlData } = supabase.storage
@@ -131,13 +298,16 @@
     const price = parseInt(document.getElementById('prod-price').value, 10);
     const stock = parseInt(document.getElementById('prod-stock').value, 10);
     const description = document.getElementById('prod-desc').value;
-    const fileInput = document.getElementById('prod-image-file');
     const accept_cod = document.getElementById('accept-cod').checked;
     const accept_online_payment = document.getElementById('accept-online').checked;
-    let image_url = '';
-    if (fileInput.files.length > 0) {
-      image_url = await uploadImage(fileInput.files[0]);
+
+    // Upload compressed images
+    let imageUrls = [...existingImages];
+    for (let fileObj of selectedFiles) {
+      const url = await uploadImage(fileObj.compressed);
+      if (url) imageUrls.push(url);
     }
+
     let productData = {
       seller_id: sellerId,
       name,
@@ -147,9 +317,10 @@
       stock,
       description,
       accept_cod,
-      accept_online_payment
+      accept_online_payment,
+      image_url: imageUrls.length > 0 ? JSON.stringify(imageUrls) : null
     };
-    if (image_url) productData.image_url = image_url;
+
     if (prodId) {
       const { error } = await supabase.from('products')
         .update(productData)
@@ -180,6 +351,9 @@
     document.querySelector("#product-form button[type=submit]").textContent = "Add Product";
     document.getElementById('accept-cod').checked = true;
     document.getElementById('accept-online').checked = true;
+    selectedFiles = [];
+    existingImages = [];
+    renderImagePreviews();
   }
 
   async function loadSellerProducts() {
@@ -193,10 +367,29 @@
     data.forEach(prod => {
       const cod = prod.accept_cod ? '<span class="option-tag cod-yes">COD</span>' : '<span class="option-tag cod-no">No COD</span>';
       const online = prod.accept_online_payment ? '<span class="option-tag online-yes">Online</span>' : '<span class="option-tag online-no">No Online</span>';
+
+      let images = [];
+      try {
+        images = prod.image_url ? JSON.parse(prod.image_url) : [];
+      } catch (e) {
+        images = prod.image_url ? [prod.image_url] : [];
+      }
+
+      let imagesHtml = '';
+      if (images.length > 0) {
+        imagesHtml = '<div class="product-images-gallery">';
+        images.forEach(url => {
+          imagesHtml += `<img src="${url}" alt="${prod.name}" />`;
+        });
+        imagesHtml += '</div>';
+      } else {
+        imagesHtml = '<img src="https://via.placeholder.com/120" alt="No image" />';
+      }
+
       const div = document.createElement('div');
       div.className = 'product-card';
       div.innerHTML = `
-        <img src="${prod.image_url || ''}" alt="${prod.name}" />
+        ${imagesHtml}
         <div class="product-name">${prod.name}</div>
         <div><b>Category:</b> ${prod.category || '-'}</div>
         <div><b>HSN Code:</b> ${prod.hsn_code || '-'}</div>
@@ -232,6 +425,14 @@
     document.querySelector("#product-form button[type=submit]").textContent = "Update Product";
     document.getElementById('accept-cod').checked = Boolean(prod.accept_cod);
     document.getElementById('accept-online').checked = Boolean(prod.accept_online_payment);
+
+    try {
+      existingImages = prod.image_url ? JSON.parse(prod.image_url) : [];
+    } catch (e) {
+      existingImages = prod.image_url ? [prod.image_url] : [];
+    }
+    selectedFiles = [];
+    renderImagePreviews();
   };
 
   window.deleteProduct = async function(prodId) {
@@ -253,10 +454,8 @@
     window.location.href = 'login.html';
   }
 
-  // Return Requests Section
   async function loadSellerReturns() {
     if (!sellerId) return;
-    // Get all return requests for this seller's products (with customer info as separate lookup)
     const { data: returns, error } = await supabase
       .from('returns')
       .select('id,quantity,reason,created_at,order_item_id')

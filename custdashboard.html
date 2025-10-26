@@ -35,7 +35,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      box-shadow: 0 4px 20px #2221  ;
+      box-shadow: 0 4px 20px #2221;
       position: sticky;
       top: 0;
       z-index: 100;
@@ -161,7 +161,8 @@
       display: inline-block;
     }
     .product-img-wrap {
-      width: 134px; min-height: 134px;
+      width: 134px;
+      min-height: 134px;
       background: #fafbfe;
       border-radius: 13px;
       display: flex;
@@ -171,9 +172,11 @@
       margin-bottom: 1.02rem;
       overflow: hidden;
       position: relative;
+      cursor: zoom-in;
     }
     .product-card img {
-      width: 130px; height: 130px;
+      width: 130px;
+      height: 130px;
       border-radius: 9px;
       object-fit: cover;
       background: #f6f7fa;
@@ -198,7 +201,7 @@
       font-weight: bold;
       margin-bottom: 0.38rem;
       margin-top: 0.02rem;
-      letter-spacing:.02em;
+      letter-spacing: .02em;
     }
     .product-seller {
       font-size: 0.98em;
@@ -221,10 +224,10 @@
       padding: 11px 28px;
       background: linear-gradient(80deg,#fbb034 60%,#ed2b77 130%);
       color: #fff;
-      border:none;
-      border-radius:10px;
-      margin-top:.15rem;
-      cursor:pointer;
+      border: none;
+      border-radius: 10px;
+      margin-top: .15rem;
+      cursor: pointer;
       box-shadow: 0 3px 12px #fbb03418;
       letter-spacing: .02em;
       transition: background .17s, color .15s, box-shadow .14s;
@@ -253,19 +256,148 @@
       user-select: none;
       box-shadow: 0 1px 12px #232f3e10;
     }
+
+    /* Image Modal Styles */
+    .image-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.92);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      animation: fadeIn 0.2s;
+    }
+    .image-modal.active {
+      display: flex;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .modal-content {
+      position: relative;
+      max-width: 90vw;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    .modal-main-image {
+      max-width: 100%;
+      max-height: 70vh;
+      object-fit: contain;
+      border-radius: 12px;
+      box-shadow: 0 10px 50px rgba(255, 255, 255, 0.1);
+    }
+    .modal-thumbnails {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 90vw;
+      overflow-x: auto;
+      padding: 10px;
+    }
+    .modal-thumbnail {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 3px solid transparent;
+      transition: border 0.2s, transform 0.15s;
+    }
+    .modal-thumbnail:hover {
+      transform: scale(1.1);
+      border-color: var(--primary);
+    }
+    .modal-thumbnail.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent);
+    }
+    .modal-close {
+      position: absolute;
+      top: 20px;
+      right: 30px;
+      font-size: 3rem;
+      color: #fff;
+      background: none;
+      border: none;
+      cursor: pointer;
+      z-index: 10000;
+      transition: transform 0.2s;
+    }
+    .modal-close:hover {
+      transform: scale(1.2) rotate(90deg);
+      color: var(--accent);
+    }
+    .modal-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 3rem;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      padding: 15px 20px;
+      cursor: pointer;
+      border-radius: 50%;
+      transition: background 0.2s;
+    }
+    .modal-nav:hover {
+      background: rgba(251, 176, 52, 0.8);
+    }
+    .modal-nav.prev {
+      left: 20px;
+    }
+    .modal-nav.next {
+      right: 20px;
+    }
+
     @media (max-width: 960px) {
-      .products-section {padding: 1rem 0.2rem 1.1rem;}
-      .header {padding: 1rem 0.2rem;}
-      .products-header {flex-direction: column;align-items:stretch;gap:.92rem;}
-      main {padding: 0 0.13rem;}
-      #products-list {gap: 1.2rem;}
+      .products-section {
+        padding: 1rem 0.2rem 1.1rem;
+      }
+      .header {
+        padding: 1rem 0.2rem;
+      }
+      .products-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: .92rem;
+      }
+      main {
+        padding: 0 0.13rem;
+      }
+      #products-list {
+        gap: 1.2rem;
+      }
+      .modal-nav {
+        font-size: 2rem;
+        padding: 10px 15px;
+      }
+      .modal-thumbnail {
+        width: 60px;
+        height: 60px;
+      }
     }
     @media (max-width: 700px) {
-      .header h1 {font-size: 1.5rem;}
+      .header h1 {
+        font-size: 1.5rem;
+      }
     }
     @media (max-width: 550px) {
-      .products-header h2 {font-size: 1.08rem;}
-      .add-cart-btn {font-size: 1em;}
+      .products-header h2 {
+        font-size: 1.08rem;
+      }
+      .add-cart-btn {
+        font-size: 1em;
+      }
     }
   </style>
 </head>
@@ -304,44 +436,85 @@
     <div id="products-list"></div>
   </div>
 </main>
+
+<!-- Image Zoom Modal -->
+<div class="image-modal" id="imageModal">
+  <button class="modal-close" onclick="closeImageModal()">&times;</button>
+  <button class="modal-nav prev" onclick="prevImage()">&#8249;</button>
+  <button class="modal-nav next" onclick="nextImage()">&#8250;</button>
+  <div class="modal-content">
+    <img class="modal-main-image" id="modalMainImage" src="" alt="Product Image" />
+    <div class="modal-thumbnails" id="modalThumbnails"></div>
+  </div>
+</div>
+
 <script>
-  const supabase = window.supabase.createClient('https://wamqheltqmufuzrqlxlb.supabase.co','eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY');
-  let customerId = null, allProducts = [];
+  const supabase = window.supabase.createClient('https://wamqheltqmufuzrqlxlb.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY');
+  let customerId = null,
+    allProducts = [];
+  let currentImages = [];
+  let currentImageIndex = 0;
+
   checkLogin();
+
   async function checkLogin() {
     const { data } = await supabase.auth.getUser();
-    if (!data.user) { alert('Please login first!'); window.location.href = 'login.html'; }
+    if (!data.user) {
+      alert('Please login first!');
+      window.location.href = 'login.html';
+    }
     customerId = data.user.id;
     loadProducts();
   }
+
   async function loadProducts() {
     const { data, error } = await supabase.from('products').select('id,name,description,price,stock,category,image_url,accept_cod,seller_id,profiles(name)').order('id', { ascending: false });
-    if (error) { allProducts = []; renderProducts(); return; }
+    if (error) {
+      allProducts = [];
+      renderProducts();
+      return;
+    }
     allProducts = data || [];
-    populateCategories(); populateSellers(); renderProducts();
+    populateCategories();
+    populateSellers();
+    renderProducts();
   }
+
   function populateCategories() {
     const cats = [...new Set(allProducts.map(p => p.category).filter(Boolean))].sort();
     const categorySelect = document.getElementById('categorySelect');
     categorySelect.innerHTML = '<option value="">All Categories</option>';
-    cats.forEach(cat => { const o=document.createElement('option'); o.value=cat; o.textContent=cat; categorySelect.appendChild(o); });
+    cats.forEach(cat => {
+      const o = document.createElement('option');
+      o.value = cat;
+      o.textContent = cat;
+      categorySelect.appendChild(o);
+    });
   }
+
   function populateSellers() {
-    const sellers = [...new Map(allProducts.filter(p=>p.profiles&&p.profiles.name).map(p=>[p.seller_id,p.profiles.name])).entries()];
-    const sellerSelect=document.getElementById('sellerSelect'); sellerSelect.innerHTML='<option value="">All Sellers</option>';
-    sellers.forEach(([id,name])=>{const o=document.createElement('option');o.value=id;o.textContent=name;sellerSelect.appendChild(o);});
+    const sellers = [...new Map(allProducts.filter(p => p.profiles && p.profiles.name).map(p => [p.seller_id, p.profiles.name])).entries()];
+    const sellerSelect = document.getElementById('sellerSelect');
+    sellerSelect.innerHTML = '<option value="">All Sellers</option>';
+    sellers.forEach(([id, name]) => {
+      const o = document.createElement('option');
+      o.value = id;
+      o.textContent = name;
+      sellerSelect.appendChild(o);
+    });
   }
-  window.renderProducts=function(){
+
+  window.renderProducts = function() {
     const searchText = document.getElementById('searchInput').value.toLowerCase();
     const categoryFilter = document.getElementById('categorySelect').value;
     const sellerFilter = document.getElementById('sellerSelect').value;
     const sortBy = document.getElementById('sortSelect').value;
-    let filtered = allProducts.filter(p=>{
-      const nameMatch = p.name ? p.name.toLowerCase().includes(searchText):false;
-      const descMatch = p.description ? p.description.toLowerCase().includes(searchText):false;
+    let filtered = allProducts.filter(p => {
+      const nameMatch = p.name ? p.name.toLowerCase().includes(searchText) : false;
+      const descMatch = p.description ? p.description.toLowerCase().includes(searchText) : false;
       const catMatch = categoryFilter === '' || p.category === categoryFilter;
       const sellerMatch = sellerFilter === '' || p.seller_id === sellerFilter;
-      return (nameMatch||descMatch) && catMatch && sellerMatch;
+      return (nameMatch || descMatch) && catMatch && sellerMatch;
     });
 
     if (sortBy === 'name_asc') filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -353,44 +526,116 @@
 
     const container = document.getElementById('products-list');
     container.innerHTML = '';
-    if (!filtered.length) { container.innerHTML = '<div class="cart-empty">No products found.</div>'; return; }
-    filtered.forEach((prod, idx)=>{
-      const isOutStock = prod.stock==null || prod.stock<=0;
-      let isFeatured = (idx<3); // Top 3 highlighted, for demo only, customize for real logic
+    if (!filtered.length) {
+      container.innerHTML = '<div class="cart-empty">No products found.</div>';
+      return;
+    }
+    filtered.forEach((prod, idx) => {
+      const isOutStock = prod.stock == null || prod.stock <= 0;
+      let isFeatured = (idx < 3);
+
+      // Parse images from JSON or single URL
+      let images = [];
+      try {
+        images = prod.image_url ? JSON.parse(prod.image_url) : [];
+      } catch (e) {
+        images = prod.image_url ? [prod.image_url] : [];
+      }
+      if (!images.length) images = ['https://via.placeholder.com/130?text=No+Image'];
+
       let div = document.createElement('div');
-      div.className = 'product-card' + (isFeatured ? ' featured':'');
+      div.className = 'product-card' + (isFeatured ? ' featured' : '');
       div.tabIndex = 0;
       div.innerHTML = `
-        <div class="product-img-wrap">
-          <img src="${prod.image_url || 'https://via.placeholder.com/130?text=No+Image'}" alt="${prod.name || ''}" />
+        <div class="product-img-wrap" onclick='openImageModal(${JSON.stringify(images)})'>
+          <img src="${images[0]}" alt="${prod.name || ''}" />
         </div>
         <div class="product-name">${prod.name || '-'}</div>
         <div class="product-price">₹${prod.price !== undefined ? prod.price : '-'}</div>
         <div class="product-seller">Seller: ${prod.profiles?.name || 'N/A'}</div>
-        <span class="stock-label${isOutStock?' out':''}">
+        <span class="stock-label${isOutStock ? ' out' : ''}">
           ${isOutStock ? 'Out of Stock' : ('In Stock: ' + prod.stock)}
         </span>
-        <button class="add-cart-btn" ${isOutStock?'disabled':''} onclick="addToCart('${prod.id}')">
+        <button class="add-cart-btn" ${isOutStock ? 'disabled' : ''} onclick="addToCart('${prod.id}')">
           ${isOutStock ? 'Out of Stock' : 'Add to Cart'}
         </button>`;
       container.appendChild(div);
     });
   };
-  window.addToCart = async function(productId){
-    const product = allProducts.find(p=>String(p.id)===String(productId)); // Fix for type mismatch
-    if (!product) { alert('Product not found!'); return; }
-    if (!product.stock||product.stock<=0) { alert('Sorry, this product is currently out of stock.'); return; }
+
+  window.openImageModal = function(images) {
+    currentImages = images;
+    currentImageIndex = 0;
+    showImageInModal(0);
+    document.getElementById('imageModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.closeImageModal = function() {
+    document.getElementById('imageModal').classList.remove('active');
+    document.body.style.overflow = 'auto';
+  };
+
+  window.prevImage = function() {
+    currentImageIndex = (currentImageIndex - 1 + currentImages.length) % currentImages.length;
+    showImageInModal(currentImageIndex);
+  };
+
+  window.nextImage = function() {
+    currentImageIndex = (currentImageIndex + 1) % currentImages.length;
+    showImageInModal(currentImageIndex);
+  };
+
+  function showImageInModal(index) {
+    document.getElementById('modalMainImage').src = currentImages[index];
+    const thumbnailsContainer = document.getElementById('modalThumbnails');
+    thumbnailsContainer.innerHTML = '';
+    currentImages.forEach((img, i) => {
+      const thumb = document.createElement('img');
+      thumb.src = img;
+      thumb.className = 'modal-thumbnail' + (i === index ? ' active' : '');
+      thumb.onclick = () => {
+        currentImageIndex = i;
+        showImageInModal(i);
+      };
+      thumbnailsContainer.appendChild(thumb);
+    });
+  }
+
+  // Close modal on ESC key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeImageModal();
+    if (e.key === 'ArrowLeft') prevImage();
+    if (e.key === 'ArrowRight') nextImage();
+  });
+
+  window.addToCart = async function(productId) {
+    const product = allProducts.find(p => String(p.id) === String(productId));
+    if (!product) {
+      alert('Product not found!');
+      return;
+    }
+    if (!product.stock || product.stock <= 0) {
+      alert('Sorry, this product is currently out of stock.');
+      return;
+    }
     try {
       const { data: item } = await supabase.from('cart').select('*').eq('customer_id', customerId).eq('product_id', productId).maybeSingle();
       if (item) {
-        if (item.quantity >= product.stock) { alert('You have reached the max available stock for this product.'); return;}
+        if (item.quantity >= product.stock) {
+          alert('You have reached the max available stock for this product.');
+          return;
+        }
         await supabase.from('cart').update({ quantity: item.quantity + 1 }).eq('id', item.id);
       } else {
         await supabase.from('cart').insert([{ customer_id: customerId, product_id: productId, quantity: 1 }]);
       }
       alert('Added to cart!');
-    } catch (error) { alert('Cart Error: '+ error.message); }
+    } catch (error) {
+      alert('Cart Error: ' + error.message);
+    }
   };
+
   window.logout = async function() {
     await supabase.auth.signOut();
     window.location.href = "login.html";

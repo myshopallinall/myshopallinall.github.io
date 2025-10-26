@@ -410,6 +410,7 @@
     <button onclick="logout()">Logout</button>
   </div>
 </div>
+
 <main>
   <div class="products-section">
     <div class="products-header">
@@ -437,7 +438,7 @@
   </div>
 </main>
 
-<!-- Image Zoom Modal -->
+<!-- Image Viewer Modal -->
 <div class="image-modal" id="imageModal">
   <button class="modal-close" onclick="closeImageModal()">&times;</button>
   <button class="modal-nav prev" onclick="prevImage()">&#8249;</button>
@@ -449,26 +450,30 @@
 </div>
 
 <script>
-  const supabase = window.supabase.createClient('https://wamqheltqmufuzrqlxlb.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY');
-  let customerId = null,
-    allProducts = [];
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  let customerId = null;
+  let allProducts = [];
   let currentImages = [];
   let currentImageIndex = 0;
 
-  checkLogin();
+  loadProducts(); // Load products directly for all users
 
   async function checkLogin() {
     const { data } = await supabase.auth.getUser();
-    if (!data.user) {
-      alert('Please login first!');
-      window.location.href = 'login.html';
-    }
-    customerId = data.user.id;
-    loadProducts();
+    if (data.user) customerId = data.user.id;
   }
 
   async function loadProducts() {
-    const { data, error } = await supabase.from('products').select('id,name,description,price,stock,category,image_url,accept_cod,seller_id,profiles(name)').order('id', { ascending: false });
+    await checkLogin();
+    const { data, error } = await supabase
+      .from('products')
+      .select('id,name,description,price,stock,category,image_url,accept_cod,seller_id,profiles(name)')
+      .order('id', { ascending: false });
+
     if (error) {
       allProducts = [];
       renderProducts();
@@ -493,7 +498,8 @@
   }
 
   function populateSellers() {
-    const sellers = [...new Map(allProducts.filter(p => p.profiles && p.profiles.name).map(p => [p.seller_id, p.profiles.name])).entries()];
+    const sellers = [...new Map(allProducts.filter(p => p.profiles && p.profiles.name)
+      .map(p => [p.seller_id, p.profiles.name])).entries()];
     const sellerSelect = document.getElementById('sellerSelect');
     sellerSelect.innerHTML = '<option value="">All Sellers</option>';
     sellers.forEach(([id, name]) => {
@@ -509,9 +515,10 @@
     const categoryFilter = document.getElementById('categorySelect').value;
     const sellerFilter = document.getElementById('sellerSelect').value;
     const sortBy = document.getElementById('sortSelect').value;
+
     let filtered = allProducts.filter(p => {
-      const nameMatch = p.name ? p.name.toLowerCase().includes(searchText) : false;
-      const descMatch = p.description ? p.description.toLowerCase().includes(searchText) : false;
+      const nameMatch = p.name?.toLowerCase().includes(searchText) || false;
+      const descMatch = p.description?.toLowerCase().includes(searchText) || false;
       const catMatch = categoryFilter === '' || p.category === categoryFilter;
       const sellerMatch = sellerFilter === '' || p.seller_id === sellerFilter;
       return (nameMatch || descMatch) && catMatch && sellerMatch;
@@ -530,20 +537,17 @@
       container.innerHTML = '<div class="cart-empty">No products found.</div>';
       return;
     }
+
     filtered.forEach((prod, idx) => {
       const isOutStock = prod.stock == null || prod.stock <= 0;
-      let isFeatured = (idx < 3);
-
-      // Parse images from JSON or single URL
+      const isFeatured = idx < 3;
       let images = [];
       try {
         images = prod.image_url ? JSON.parse(prod.image_url) : [];
-      } catch (e) {
-        images = prod.image_url ? [prod.image_url] : [];
-      }
+      } catch { images = prod.image_url ? [prod.image_url] : []; }
       if (!images.length) images = ['https://via.placeholder.com/130?text=No+Image'];
 
-      let div = document.createElement('div');
+      const div = document.createElement('div');
       div.className = 'product-card' + (isFeatured ? ' featured' : '');
       div.tabIndex = 0;
       div.innerHTML = `
@@ -551,18 +555,20 @@
           <img src="${images[0]}" alt="${prod.name || ''}" />
         </div>
         <div class="product-name">${prod.name || '-'}</div>
-        <div class="product-price">₹${prod.price !== undefined ? prod.price : '-'}</div>
+        <div class="product-price">₹${prod.price ?? '-'}</div>
         <div class="product-seller">Seller: ${prod.profiles?.name || 'N/A'}</div>
         <span class="stock-label${isOutStock ? ' out' : ''}">
           ${isOutStock ? 'Out of Stock' : ('In Stock: ' + prod.stock)}
         </span>
         <button class="add-cart-btn" ${isOutStock ? 'disabled' : ''} onclick="addToCart('${prod.id}')">
           ${isOutStock ? 'Out of Stock' : 'Add to Cart'}
-        </button>`;
+        </button>
+      `;
       container.appendChild(div);
     });
   };
 
+  // --- Image Modal Logic ---
   window.openImageModal = function(images) {
     currentImages = images;
     currentImageIndex = 0;
@@ -570,46 +576,45 @@
     document.getElementById('imageModal').classList.add('active');
     document.body.style.overflow = 'hidden';
   };
-
   window.closeImageModal = function() {
     document.getElementById('imageModal').classList.remove('active');
     document.body.style.overflow = 'auto';
   };
-
   window.prevImage = function() {
     currentImageIndex = (currentImageIndex - 1 + currentImages.length) % currentImages.length;
     showImageInModal(currentImageIndex);
   };
-
   window.nextImage = function() {
     currentImageIndex = (currentImageIndex + 1) % currentImages.length;
     showImageInModal(currentImageIndex);
   };
-
   function showImageInModal(index) {
     document.getElementById('modalMainImage').src = currentImages[index];
-    const thumbnailsContainer = document.getElementById('modalThumbnails');
-    thumbnailsContainer.innerHTML = '';
+    const thumbs = document.getElementById('modalThumbnails');
+    thumbs.innerHTML = '';
     currentImages.forEach((img, i) => {
-      const thumb = document.createElement('img');
-      thumb.src = img;
-      thumb.className = 'modal-thumbnail' + (i === index ? ' active' : '');
-      thumb.onclick = () => {
-        currentImageIndex = i;
-        showImageInModal(i);
-      };
-      thumbnailsContainer.appendChild(thumb);
+      const el = document.createElement('img');
+      el.src = img;
+      el.className = 'modal-thumbnail' + (i === index ? ' active' : '');
+      el.onclick = () => { currentImageIndex = i; showImageInModal(i); };
+      thumbs.appendChild(el);
     });
   }
 
-  // Close modal on ESC key
-  document.addEventListener('keydown', (e) => {
+  document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeImageModal();
     if (e.key === 'ArrowLeft') prevImage();
     if (e.key === 'ArrowRight') nextImage();
   });
 
+  // --- Cart Function ---
   window.addToCart = async function(productId) {
+    if (!customerId) {
+      alert('Please login first to add products to cart.');
+      window.location.href = 'login.html';
+      return;
+    }
+
     const product = allProducts.find(p => String(p.id) === String(productId));
     if (!product) {
       alert('Product not found!');
@@ -619,11 +624,13 @@
       alert('Sorry, this product is currently out of stock.');
       return;
     }
+
     try {
-      const { data: item } = await supabase.from('cart').select('*').eq('customer_id', customerId).eq('product_id', productId).maybeSingle();
+      const { data: item } = await supabase.from('cart').select('*')
+        .eq('customer_id', customerId).eq('product_id', productId).maybeSingle();
       if (item) {
         if (item.quantity >= product.stock) {
-          alert('You have reached the max available stock for this product.');
+          alert('You reached max available stock.');
           return;
         }
         await supabase.from('cart').update({ quantity: item.quantity + 1 }).eq('id', item.id);
@@ -636,10 +643,11 @@
     }
   };
 
-  window.logout = async function() {
+  async function logout() {
     await supabase.auth.signOut();
-    window.location.href = "login.html";
-  };
+    customerId = null;
+    alert('You have logged out.');
+  }
 </script>
 </body>
 </html>

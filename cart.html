@@ -257,7 +257,7 @@
     rzp.open();
   };
 
-  async function placeOrder(cartItems, totalAmount, paymentId, paymentType) {
+async function placeOrder(cartItems, totalAmount, paymentId, paymentType) {
     try {
       const orderStatus = paymentType === 'cod' ? 'pending' : 'paid';
       const { data: order, error: orderError } = await supabase
@@ -267,18 +267,30 @@
         .single();
       if (orderError) throw new Error(orderError.message);
 
-      // Insert order items and track sellers
+      // Insert order items and set gst_rate if missing from products table
       let uniqueSellers = new Set();
       for (let i of cartItems) {
+        let gstRateToUse = i.products.gst_rate;
+        if (gstRateToUse === null || gstRateToUse === undefined) {
+          // Fetch gst_rate from product just to be safe (though products fetched already have it)
+          const { data: prod, error: prodError } = await supabase
+            .from('products').select('gst_rate').eq('id', i.product_id).single();
+          if (!prodError && prod) {
+            gstRateToUse = prod.gst_rate;
+          }
+        }
+
         await supabase.from('order_items').insert([{
           order_id: order.id,
           product_id: i.product_id,
           seller_id: i.products.seller_id,
           quantity: i.quantity,
           price: i.products.price,
+          gst_rate: gstRateToUse,
           status: 'pending'
         }]);
-        const newStock = (i.products.stock || 0) - i.quantity;
+
+                const newStock = (i.products.stock || 0) - i.quantity;
         if (newStock >= 0)
           await supabase.from('products').update({ stock: newStock }).eq('id', i.product_id);
 

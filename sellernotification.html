@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Seller Notification</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    .nav-notif-group {
+      display: flex;
+      align-items: center;
+      gap: 23px;
+      position: relative;
+    }
+    .seller-notif-btn {
+      background: #ffd814;
+      color: #232f3e;
+      font-weight: 600;
+      font-size: 1rem;
+      border: none;
+      border-radius: 6px;
+      padding: 10px 21px;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+      box-shadow: 0 2px 12px #ffd81410, 0 1px 2px #2221;
+      position: relative;
+    }
+    .seller-notif-btn:hover {
+      background: #232f3e;
+      color: #ffd814;
+    }
+    .notif-badge {
+      position: absolute;
+      top: -10px;
+      right: -9px;
+      background: #e02401;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 1em;
+      font-weight: bold;
+      padding: 3.5px 11px;
+      min-width: 19px;
+      text-align: center;
+      box-shadow: 0 2px 10px #a12d310c;
+      border: 2px solid #222f3e;
+      z-index: 5;
+      line-height: 1.09em;
+    }
+    .notification-alert {
+      background: #fff3e3;
+      color: #be4c00;
+      border-left: 5px solid #ffbb47;
+      border-radius: 6px;
+      margin: 23px 8vw;
+      max-width: 580px;
+      padding: 13px 19px;
+      font-weight: 600;
+      font-size: 1.11em;
+      box-shadow: 0 3px 18px #ffb60008, 0 2px 8px #232f3e13;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div class="nav-notif-group">
+  <button id="seller-orders-btn" class="seller-notif-btn">
+    Seller Orders
+    <span id="notifBadge" class="notif-badge" style="display:none;"></span>
+  </button>
+</div>
+<div id="notificationAlert" class="notification-alert"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+  let sellerId = null;
+
+  async function getUserAndCheck() {
+    const { data } = await supabase.auth.getUser();
+    if (!data || !data.user) return;
+    sellerId = data.user.id;
+    checkNewOrderNotifications();
+  }
+
+  async function checkNewOrderNotifications() {
+    const { data: orderItems, error } = await supabase
+      .from('order_items')
+      .select('id, order_id, delivery_status')
+      .eq('seller_id', sellerId)
+      .in('delivery_status', ['placed','pending']);
+    if (error) return;
+
+    const uniqueOrderIds = Array.from(new Set((orderItems || []).map(i => i.order_id)));
+    const count = uniqueOrderIds.length;
+    const notifBadge = document.getElementById('notifBadge');
+    const notificationAlert = document.getElementById('notificationAlert');
+    if (count > 0) {
+      notifBadge.style.display = '';
+      notifBadge.textContent = count > 99 ? '99+' : count;
+      notificationAlert.style.display = '';
+      notificationAlert.textContent = `You have ${count} new order${count > 1 ? 's' : ''} placed.`;
+    } else {
+      notifBadge.style.display = 'none';
+      notificationAlert.style.display = 'none';
+    }
+  }
+
+  document.getElementById('seller-orders-btn').onclick = () => window.location.href = 'seller_order.html';
+
+  getUserAndCheck();
+</script>
+</body>
+</html>

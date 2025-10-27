@@ -67,27 +67,54 @@
       <hr>
       <table><thead>
         <tr>
-          <th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th>
-          <th>Total</th><th>Delivery Status</th><th>Payment (COD)</th><th>Tracking Info</th>
-        </tr></thead><tbody>`;
-    itemsMine.forEach(item=>{
-      let prodStatusClass = "prod-status-ind " + (DELIVERY_STATUSES.includes(item.delivery_status) ? ("prod-status-" + item.delivery_status) : "prod-status-pending");
-      let paymentBadge = (item.is_cod) ? (
-        item.cod_payment_status==="paid"
-          ? '<span class="paid-badge">COD Paid</span>'
-          : '<span class="cod-badge">COD Pending</span>'
-      ) : '<span class="cod-badge">Not COD</span>';
-      let trackingHtml = item.courier_tracking_number ? `${item.courier_name||''}<br>${item.courier_tracking_number}` : "-";
-      html += `<tr>
-        <td>${item.products.name}</td><td>${item.hsn_code||"-"}</td>
-        <td>${item.quantity}</td><td>₹${item.price}</td>
-        <td>₹${item.price*item.quantity}</td>
-        <td><span class="${prodStatusClass}">${(item.delivery_status||"pending").toUpperCase()}</span></td>
-        <td>${paymentBadge}</td>
-        <td>${trackingHtml}</td>
-        </tr>`;
-    });
-    const total = itemsMine.reduce((sum,i)=>sum+i.price*i.quantity,0);
+
+  <th>Product</th>
+  <th>HSN Code</th>
+  <th>Qty</th>
+  <th>Unit Price</th>
+  <th>Total</th>
+  <th>CGST</th>
+  <th>SGST</th>
+  <th>Delivery Status</th>
+  <th>Payment (COD)</th>
+  <th>Tracking Info</th>
+
+</tr></thead><tbody>`;
+  itemsMine.forEach(item => {
+  const gstRate = item.gst_rate || 0;
+  const priceInc = item.price;
+  const quantity = item.quantity;
+
+  const priceBase = priceInc / (1 + gstRate / 100);
+  const gstPerUnit = priceInc - priceBase;
+
+  const lineTotal = priceInc * quantity;
+  const baseTotal = priceBase * quantity;
+  const gstTotal = gstPerUnit * quantity;
+  const cgst = gstTotal / 2;
+  const sgst = gstTotal / 2;
+
+  let prodStatusClass = "prod-status-ind " + (DELIVERY_STATUSES.includes(item.delivery_status) ? ("prod-status-" + item.delivery_status) : "prod-status-pending");
+  let paymentBadge = (item.is_cod) ? (
+    item.cod_payment_status==="paid"
+      ? '<span class="paid-badge">COD Paid</span>'
+      : '<span class="cod-badge">COD Pending</span>'
+  ) : '<span class="cod-badge">Not COD</span>';
+  let trackingHtml = item.courier_tracking_number ? `${item.courier_name||''}<br>${item.courier_tracking_number}` : "-";
+  html += `<tr>
+    <td>${item.products.name}</td>
+    <td>${item.hsn_code||"-"}</td>
+    <td>${item.quantity}</td>
+    <td>₹${item.price.toFixed(2)}</td>
+    <td>₹${lineTotal.toFixed(2)}</td>
+    <td>₹${cgst.toFixed(2)}</td>
+    <td>₹${sgst.toFixed(2)}</td>
+    <td><span class="${prodStatusClass}">${(item.delivery_status||"pending").toUpperCase()}</span></td>
+    <td>${paymentBadge}</td>
+    <td>${trackingHtml}</td>
+    </tr>`;
+});
+ const total = itemsMine.reduce((sum,i)=>sum+i.price*i.quantity,0);
     html+=`</tbody></table><hr><h3>Total: ₹${total}</h3>`;
     document.getElementById('invoice-details').innerHTML=html;
   }

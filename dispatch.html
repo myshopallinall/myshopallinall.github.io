@@ -51,21 +51,21 @@
       window.location.href = 'login.html';
       return;
     }
-    const { data: orders, error } = await supabase.from('orders')
-      .select(`
-        id,
-        customer_id,
-        created_at,
-        profiles:customer_id(name),
-        order_items(
-          id,
-          hsn_code,
-          status,
-          delivery_status,
-          profiles_seller: seller_id(id)
-        )
-      `)
-      .order('created_at', { ascending: false });
+   const { data: orders, error } = await supabase.from('orders')
+  .select(`
+    id,
+    customer_id,
+    created_at,
+    profiles:customer_id(name),
+    order_items(
+      id,
+      hsn_code,
+      status,
+      delivery_status,
+      profiles_seller:seller_id(id)
+    )
+  `)
+  .order('created_at', { ascending: false });
 
     if (error) return;
 

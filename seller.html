@@ -389,7 +389,16 @@
     <option value="" disabled selected>Select Subcategory</option>
   </select>
   <input type="text" id="hsn-code" placeholder="HSN Code" />
+  <input type="text" id="prod-sku" placeholder="SKU" />
+  <input type="number" step="0.001" min="0" id="prod-weight" placeholder="Weight (kg)" />
+
+  <input type="number" min="0" step="0.01" id="dim-length" placeholder="Length" />
+  <input type="number" min="0" step="0.01" id="dim-width" placeholder="Width" />
+  <input type="number" min="0" step="0.01" id="dim-height" placeholder="Height" />
+
   <input type="number" step="0.01" min="0" id="prod-price" placeholder="Price (₹)" required />
+  <input type="number" step="0.01" min="0" id="gst-rate" placeholder="GST Rate (%)" required />
+  <input type="number" step="0.01" min="0" id="mrp-price" placeholder="MRP (₹)" required />
   <input type="number" min="0" id="prod-stock" placeholder="Stock (Qty)" required />
   <textarea id="prod-desc" placeholder="Description"></textarea>
   <label for="prod-image-file" style="display:block; margin-top:10px; font-weight:bold;">Product Images (Max 5, compressed ~50KB)</label>
@@ -416,6 +425,15 @@
     'https://wamqheltqmufuzrqlxlb.supabase.co',
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
   );
+const length = parseFloat(document.getElementById('dim-length').value) || 0;
+const width = parseFloat(document.getElementById('dim-width').value) || 0;
+const height = parseFloat(document.getElementById('dim-height').value) || 0;
+
+const dimensions = {
+  length: length,
+  width: width,
+  height: height
+};
 
   // --- POPUP: New Seller Orders ---
   async function checkNewOrdersPopup() {
@@ -437,7 +455,7 @@
     }
   }
   // Run popup check on load and every 60s
-  setInterval(checkNewOrdersPopup, 60000);
+  setInterval(checkNewOrdersPopup, 2000);
   let sellerId = null, selectedFiles = [], existingImages = [];
   let allCategoriesList = [];
 
@@ -633,62 +651,85 @@
   }
 
   document.getElementById('product-form').onsubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const prodId = document.getElementById('prod-id').value || null;
-    const name = document.getElementById('prod-name').value.trim();
-    const categoryId = document.getElementById('category').value;
-    const subcategoryId = document.getElementById('subcategory').value || null;
-    const hsn_code = document.getElementById('hsn-code').value.trim() || null;
-    const price = parseFloat(document.getElementById('prod-price').value);
-    const stock = parseInt(document.getElementById('prod-stock').value, 10);
-    const description = document.getElementById('prod-desc').value.trim() || null;
-    const accept_cod = document.getElementById('accept-cod').checked;
-    const accept_online_payment = document.getElementById('accept-online').checked;
+const prodId = document.getElementById('prod-id').value;
 
-    if (!name || !categoryId || isNaN(price) || isNaN(stock)) {
-      alert('Please fill required fields correctly.');
-      return;
-    }
+  const name = document.getElementById('prod-name').value.trim();
+  const categoryId = document.getElementById('category').value;
+  const subcategoryId = document.getElementById('subcategory').value || null;
+  const hsn_code = document.getElementById('hsn-code').value.trim() || null;
+  const price = parseFloat(document.getElementById('prod-price').value);
+  const stock = parseInt(document.getElementById('prod-stock').value, 10);
+  const description = document.getElementById('prod-desc').value.trim() || null;
+  const accept_cod = document.getElementById('accept-cod').checked;
+  const accept_online_payment = document.getElementById('accept-online').checked;
+  const gstRate = parseFloat(document.getElementById('gst-rate').value);
+  const mrpPrice = parseFloat(document.getElementById('mrp-price').value);
+  const sku = document.getElementById('prod-sku').value.trim() || null;
+  const weightRaw = document.getElementById('prod-weight').value;
+  const weight = weightRaw === '' ? null : parseFloat(weightRaw);
 
-    let imageUrls = [...existingImages];
-    for (const fileObj of selectedFiles) {
-      const url = await uploadImage(fileObj.compressed);
-      if (url) imageUrls.push(url);
-    }
+  const length = parseFloat(document.getElementById('dim-length').value) || 0;
+  const width = parseFloat(document.getElementById('dim-width').value) || 0;
+  const height = parseFloat(document.getElementById('dim-height').value) || 0;
+  const dimensions = { length, width, height };
 
-    const productData = {
-      seller_id: sellerId,
-      name,
-      category_id: subcategoryId || categoryId,
-      hsn_code,
-      price,
-      stock,
-      description,
-      accept_cod,
-      accept_online_payment,
-      image_url: imageUrls.length ? JSON.stringify(imageUrls) : null,
-    };
+  // Basic validation
+  if (!name || !categoryId || isNaN(price) || isNaN(stock) || isNaN(gstRate) || isNaN(mrpPrice) || (weight !== null && isNaN(weight))) {
+    alert('Please fill required fields correctly.');
+    return;
+  }
 
-    if (prodId) {
-      const { error } = await supabase.from('products').update(productData).eq('id', prodId);
-      if (error) alert('Failed to update product: ' + error.message);
-      else {
-        alert('Product updated successfully!');
-        resetForm();
-        loadSellerProducts();
-      }
-    } else {
-      const { error } = await supabase.from('products').insert([productData]);
-      if (error) alert('Failed to add product: ' + error.message);
-      else {
-        alert('Product added successfully!');
-        resetForm();
-        loadSellerProducts();
-      }
-    }
+  let imageUrls = [...existingImages];
+  for (const fileObj of selectedFiles) {
+    const url = await uploadImage(fileObj.compressed);
+    if (url) imageUrls.push(url);
+  }
+
+  const productData = {
+    seller_id: sellerId,
+    name,
+    category_id: subcategoryId || categoryId,
+    hsn_code,
+    price,
+    stock,
+    description,
+    accept_cod,
+    accept_online_payment,
+    sku,
+    weight,
+    dimensions,
+    gst_rate: gstRate,
+    mrp: mrpPrice,
+    image_url: imageUrls.length ? JSON.stringify(imageUrls) : null,
   };
 
+  if (prodId) {
+  const { data, error } = await supabase.from('products')
+    .update(productData)
+    .eq('id', prodId);
+
+  if (error) {
+    console.error('Update error:', error);
+    alert('Failed to update product: ' + error.message);
+  } else {
+    alert('Product updated successfully!');
+    resetForm();
+    loadSellerProducts();
+  }
+} else {
+const { error } = await supabase.from('products')
+      .insert([productData]);
+    if (error) {
+      alert('Failed to add product: ' + error.message);
+    } else {
+      alert('Product added successfully!');
+      resetForm();
+      loadSellerProducts();
+    }
+  }
+};
   function resetForm() {
     document.getElementById('product-form').reset();
     document.getElementById('prod-id').value = '';
@@ -738,8 +779,16 @@
         <div class="product-name">${prod.name}</div>
         <div><b>Category ID:</b> ${prod.category_id || '-'}</div>
         <div><b>HSN Code:</b> ${prod.hsn_code || '-'}</div>
+
         <div class="product-price">₹${prod.price.toFixed(2)}</div>
-        <div class="product-desc">${prod.description || ''}</div>
+     <div><b>SKU:</b> ${prod.sku || '-'}</div>
+<div><b>Weight:</b> ${prod.weight ? prod.weight.toFixed(3) + ' kg' : '-'}</div>
+<div><b>Dimensions:</b> ${prod.dimensions ? JSON.stringify(prod.dimensions) : '-'}</div>
+
+        <div><b>GST Rate:</b> ${prod.gst_rate ? prod.gst_rate + '%' : '-'}</div>
+        <div><b>MRP:</b> ₹${prod.mrp ? prod.mrp.toFixed(2) : '-'}</div>
+   <div class="product-desc">${prod.description || ''}</div>
+
         <div>
           <span class="stock-label ${prod.stock > 0 ? 'in-stock':'out-stock'}">
             ${prod.stock > 0 ? 'In Stock (' + prod.stock + ')':'Out of Stock'}
@@ -763,13 +812,36 @@
     document.getElementById('prod-name').value = prod.name;
     document.getElementById('category').value = prod.category_id || '';
     document.getElementById('hsn-code').value = prod.hsn_code || '';
+    document.getElementById('prod-sku').value = prod.sku || '';
+    document.getElementById('prod-weight').value = prod.weight || '';
+if (prod.dimensions) {
+  try {
+    const dims = prod.dimensions;
+    document.getElementById('dim-length').value = dims.length || '';
+    document.getElementById('dim-width').value = dims.width || '';
+    document.getElementById('dim-height').value = dims.height || '';
+  } catch (e) {
+    document.getElementById('dim-length').value = '';
+    document.getElementById('dim-width').value = '';
+    document.getElementById('dim-height').value = '';
+  }
+} else {
+  document.getElementById('dim-length').value = '';
+  document.getElementById('dim-width').value = '';
+  document.getElementById('dim-height').value = '';
+}
+
     document.getElementById('prod-price').value = prod.price;
+    document.getElementById('gst-rate').value = prod.gst_rate ?? '';
+    document.getElementById('mrp-price').value = prod.mrp ?? '';
+
     document.getElementById('prod-stock').value = prod.stock;
     document.getElementById('prod-desc').value = prod.description || '';
     document.getElementById('cancel-edit-btn').style.display = 'inline-block';
     document.querySelector('#product-form button[type=submit]').textContent = 'Update Product';
     document.getElementById('accept-cod').checked = Boolean(prod.accept_cod);
     document.getElementById('accept-online').checked = Boolean(prod.accept_online_payment);
+
 
     try {
       existingImages = prod.image_url ? JSON.parse(prod.image_url) : [];

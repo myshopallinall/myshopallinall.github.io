@@ -83,31 +83,40 @@
         if (error) throw error;
         const user = data.user;
         // Insert profile row if not exists
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .maybeSingle();
-        if (!profile) {
-          await supabase.from('profiles').insert([{
-            id: user.id,
-            name,
-            email,
-            role,
-            created_at: new Date()
-          }]);
-        }
-        messageDiv.textContent = "Login successful!";
-        messageDiv.className = "success";
-        setTimeout(() => {
-          if (role === "seller") window.location.href = "seller.html";
-          else window.location.href = "custdashboard.html";
-        }, 1500);
-      } catch (err) {
-        messageDiv.textContent = "Error: " + err.message;
-        messageDiv.className = 'error';
-      }
-    };
+         const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('email', email)
+      .maybeSingle();
+ if (profileError) throw profileError;
+
+       if (!profile) {
+      await supabase.from('profiles').insert([{
+        id: user.id,
+        name,
+        email,
+        role: 'customer',
+        created_at: new Date()
+      }]);
+      messageDiv.textContent = "Login successful!";
+      messageDiv.className = "success";
+      setTimeout(() => window.location.href = "custdashboard.html", 1500);
+      return;
+    }
+     if (profile.role === 'seller') {
+      messageDiv.textContent = "Login successful as seller.";
+      messageDiv.className = "success";
+      setTimeout(() => window.location.href = "seller.html", 1500);
+    } else {
+      messageDiv.textContent = "Login successful as customer.";
+      messageDiv.className = "success";
+      setTimeout(() => window.location.href = "custdashboard.html", 1500);
+    }
+  } catch (err) {
+    messageDiv.textContent = "Error: " + err.message;
+    messageDiv.className = 'error';
+  }
+};
 
     // 2. Forgot password modal handlers
     const forgotModal = document.getElementById('forgot-modal');

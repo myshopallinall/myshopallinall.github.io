@@ -1,24 +1,106 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Login - MyShop</title>
   <style>
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f2f5fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
-    #login-form, #reset-form { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 360px; width: 100%; }
-    #login-form h2, #reset-form h2 { margin-bottom: 1rem; color: #0070f3; text-align: center; }
-    input, select, button { width: 100%; padding: 0.8rem; margin: 0.5rem 0 1rem 0; border-radius: 6px; border: 1.5px solid #ddd; font-size: 1rem; }
-    button { background-color: #0070f3; color: white; font-weight: bold; border: none; cursor: pointer; transition: background-color 0.25s ease; }
-    button:hover { background-color: #005bb5; }
-    .error { color: #e74c3c; margin-bottom: 1rem; font-weight: bold; }
-    .success { color: #27ae60; margin-bottom: 1rem; font-weight: bold; }
-    .link { color: #0070f3; text-align: right; font-size: 0.98rem; margin-bottom: 0.6rem; text-decoration: underline; cursor: pointer;}
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f2f5fa;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    #login-form,
+    #reset-form {
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+      max-width: 360px;
+      width: 100%;
+    }
+    #login-form h2,
+    #reset-form h2 {
+      margin-bottom: 1rem;
+      color: #0070f3;
+      text-align: center;
+    }
+    input,
+    select,
+    button {
+      width: 100%;
+      padding: 0.8rem;
+      margin: 0.5rem 0 1rem 0;
+      border-radius: 6px;
+      border: 1.5px solid #ddd;
+      font-size: 1rem;
+    }
+    button {
+      background-color: #0070f3;
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.25s ease;
+    }
+    button:hover {
+      background-color: #005bb5;
+    }
+    .error {
+      color: #e74c3c;
+      margin-bottom: 1rem;
+      font-weight: bold;
+    }
+    .success {
+      color: #27ae60;
+      margin-bottom: 1rem;
+      font-weight: bold;
+    }
+    .link {
+      color: #0070f3;
+      text-align: right;
+      font-size: 0.98rem;
+      margin-bottom: 0.6rem;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    #google-login {
+      background-color: #db4437; /* Google red */
+      margin-top: 0;
+    }
+    #google-login:hover {
+      background-color: #a33d2d;
+    }
     /* Forgot password modal */
-    #forgot-modal { display:none; position:fixed; top:0; left:0;width:100vw;height:100vh; background:#0008;justify-content:center;align-items:center; z-index:2;}
-    #forgot-form {background:white;padding:2rem;border-radius:10px;max-width:340px;width:100%;box-shadow:0 4px 16px #0002;display:flex;flex-direction:column;}
-    #forgot-form h3 { color:#0070f3; margin-bottom:0.8rem;}
-
+    #forgot-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #0008;
+      justify-content: center;
+      align-items: center;
+      z-index: 2;
+    }
+    #forgot-form {
+      background: white;
+      padding: 2rem;
+      border-radius: 10px;
+      max-width: 340px;
+      width: 100%;
+      box-shadow: 0 4px 16px #0002;
+      display: flex;
+      flex-direction: column;
+    }
+    #forgot-form h3 {
+      color: #0070f3;
+      margin-bottom: 0.8rem;
+    }
   </style>
 </head>
 <body>
@@ -34,6 +116,7 @@
     <option value="seller">Seller</option>
   </select>
   <button type="submit">Login</button>
+  <button id="google-login" type="button">Continue with Google</button>
   <div class="link" id="forgot-link">Forgot password?</div>
   <div class="link" onclick="window.location.href='signup.html'">New user? Sign up</div>
 </form>
@@ -44,13 +127,13 @@
     <h3>Reset Password</h3>
     <input type="email" id="forgot-email" placeholder="Enter your email" required />
     <button type="submit">Send Reset Email</button>
-    <button type="button" id="close-forgot" style="margin-top:4px;">Cancel</button>
-    <div id="forgot-message" style="margin-top:8px"></div>
+    <button type="button" id="close-forgot" style="margin-top: 4px;">Cancel</button>
+    <div id="forgot-message" style="margin-top: 8px"></div>
   </form>
 </div>
 
-<!-- Hidden Reset Password Form: displayed if "#access_token" is in URL hash -->
-<div id="reset-container" style="display:none;">
+<!-- Hidden Reset Password Form for Access Token -->
+<div id="reset-container" style="display: none;">
   <form id="reset-form">
     <h2>Set New Password</h2>
     <input type="password" id="new-password" placeholder="New password" required />
@@ -59,18 +142,21 @@
   </form>
 </div>
 
+<!-- ...Keep your existing HTML and CSS... -->
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  window.onload = function() {
+  window.onload = function () {
     const supabase = window.supabase.createClient(
       'https://wamqheltqmufuzrqlxlb.supabase.co',
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
     );
 
-    // 1. Regular login handling
-    const form = document.getElementById('login-form');
+    const loginForm = document.getElementById('login-form');
     const messageDiv = document.getElementById('message');
-    form.onsubmit = async function(e) {
+
+    // Improved login handler
+    loginForm.onsubmit = async function (e) {
       e.preventDefault();
       messageDiv.textContent = '';
       messageDiv.className = '';
@@ -78,71 +164,91 @@
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value.trim();
       const role = document.getElementById('role').value;
+
       try {
-        messageDiv.textContent = "Signing in, please wait...";
+        messageDiv.textContent = 'Signing in, please wait...';
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          messageDiv.textContent = 'Login failed: ' + error.message;
+          messageDiv.className = 'error';
+          return;
+        }
         const user = data.user;
-        // Insert profile row if not exists
-         const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('email', email)
-      .maybeSingle();
- if (profileError) throw profileError;
 
-       if (!profile) {
-      await supabase.from('profiles').insert([{
-        id: user.id,
-        name,
-        email,
-        role: 'customer',
-        created_at: new Date()
-      }]);
-      messageDiv.textContent = "Login successful!";
-      messageDiv.className = "success";
-      setTimeout(() => window.location.href = "custdashboard.html", 1500);
-      return;
-    }
-     if (profile.role === 'seller') {
-      messageDiv.textContent = "Login successful as seller.";
-      messageDiv.className = "success";
-      setTimeout(() => window.location.href = "seller.html", 1500);
-    } else {
-      messageDiv.textContent = "Login successful as customer.";
-      messageDiv.className = "success";
-      setTimeout(() => window.location.href = "custdashboard.html", 1500);
-    }
-  } catch (err) {
-    messageDiv.textContent = "Error: " + err.message;
-    messageDiv.className = 'error';
-  }
-};
+        // Check or insert profile with role
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('email', email)
+          .maybeSingle();
 
-    // 2. Forgot password modal handlers
-    const forgotModal = document.getElementById('forgot-modal');
-    document.getElementById('forgot-link').onclick = () => forgotModal.style.display='flex';
-    document.getElementById('close-forgot').onclick = () => forgotModal.style.display='none';
+        if (profileError) {
+          messageDiv.textContent = 'Profile error: ' + profileError.message;
+          messageDiv.className = 'error';
+          return;
+        }
 
-    document.getElementById('forgot-form').onsubmit = async function(e) {
-      e.preventDefault();
-      const email = document.getElementById('forgot-email').value.trim();
-      const msg = document.getElementById('forgot-message');
-      msg.textContent = "Sending reset email...";
-      try {
-        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin + window.location.pathname // points to same page
-        });
-        if (error) throw error;
-        msg.textContent = "Reset email sent! Check your inbox.";
+        if (!profile) {
+          await supabase.from('profiles').insert([
+            {
+              id: user.id,
+              name,
+              email,
+              role: role,
+              created_at: new Date(),
+            },
+          ]);
+          messageDiv.textContent = 'Login successful!';
+          messageDiv.className = 'success';
+          setTimeout(() => (window.location.href = role === 'seller' ? 'seller.html' : 'custdashboard.html'), 1500);
+        } else {
+          messageDiv.textContent = `Login successful as ${profile.role}.`;
+          messageDiv.className = 'success';
+          setTimeout(() => (window.location.href = profile.role === 'seller' ? 'seller.html' : 'custdashboard.html'), 1500);
+        }
       } catch (err) {
-        msg.textContent = "Error: " + err.message;
+        messageDiv.textContent = 'Error: ' + err.message;
+        messageDiv.className = 'error';
       }
     };
 
-    // 3. Display reset password form if URL hash contains access_token
+    // Google OAuth login handler
+  document.getElementById('google-login').onclick = async function () {
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    if (error) throw error;
+  } catch (err) {
+    alert('Google OAuth error: ' + err.message);
+  }
+};
+
+    // Forgot password modal handlers
+    const forgotModal = document.getElementById('forgot-modal');
+    document.getElementById('forgot-link').onclick = () => (forgotModal.style.display = 'flex');
+    document.getElementById('close-forgot').onclick = () => (forgotModal.style.display = 'none');
+
+    // Improved password reset handler
+    document.getElementById('forgot-form').onsubmit = async function (e) {
+      e.preventDefault();
+      const email = document.getElementById('forgot-email').value.trim();
+      const msg = document.getElementById('forgot-message');
+      msg.textContent = 'Sending reset email...';
+      try {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + window.location.pathname,
+        });
+        if (error) {
+          msg.textContent = 'Error: ' + error.message;
+        } else {
+          msg.textContent = 'Reset email sent! Check your inbox.';
+        }
+      } catch (err) {
+        msg.textContent = 'Error: ' + err.message;
+      }
+    };
+
     function showResetFormIfNeeded() {
-      if (window.location.hash.includes("access_token")) {
+      if (window.location.hash.includes('access_token')) {
         document.getElementById('login-form').style.display = 'none';
         document.getElementById('forgot-modal').style.display = 'none';
         document.getElementById('reset-container').style.display = 'block';
@@ -151,23 +257,23 @@
     showResetFormIfNeeded();
     window.addEventListener('hashchange', showResetFormIfNeeded);
 
-    // 4. Handle password reset form submission
-    document.getElementById('reset-form').onsubmit = async function(e) {
+    // Improved password update flow
+    document.getElementById('reset-form').onsubmit = async function (e) {
       e.preventDefault();
       const newPassword = document.getElementById('new-password').value;
       const msg = document.getElementById('reset-message');
-      msg.textContent = "Updating password...";
-      msg.className = "";
-      // Wait until Supabase recognizes PASSWORD_RECOVERY mode
+      msg.textContent = 'Updating password...';
+      msg.className = '';
+
       supabase.auth.onAuthStateChange(async (event) => {
-        if (event === "PASSWORD_RECOVERY" || window.location.hash.includes("access_token")) {
+        if (event === 'PASSWORD_RECOVERY' || window.location.hash.includes('access_token')) {
           const { error } = await supabase.auth.updateUser({ password: newPassword });
           if (error) {
-            msg.textContent = "Error: " + error.message;
-            msg.className = "error";
+            msg.textContent = 'Error: ' + error.message;
+            msg.className = 'error';
           } else {
-            msg.textContent = "Password updated! You can now log in with your new password.";
-            msg.className = "success";
+            msg.textContent = 'Password updated successfully! You can now log in.';
+            msg.className = 'success';
           }
         }
       });

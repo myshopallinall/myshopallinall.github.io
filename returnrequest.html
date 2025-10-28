@@ -327,8 +327,11 @@
             return;
           }
           // Mark as returned
-          const { error: upError } = await supabase.from('order_items').update({ returned: true }).eq('id', item.id);
-          if (upError) {
+         const { error: upError } = await supabase
+             .from('order_items')
+             .update({ returned: true, status: 'returned' })
+             .eq('id', item.id);
+       if (upError) {
             msg.style.color = "red";
             msg.textContent = "Failed to update: " + upError.message;
             returnBtn.disabled = false;

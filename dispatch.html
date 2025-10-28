@@ -16,6 +16,11 @@
     .delivery-status-badge { padding: 2px 11px; border-radius: 11px; color: #fff; font-weight: bold; font-size: 0.99em; }
     .status-delivered { background: #219f43;}
     .status-cancelled { background: #d82c27 !important; color: #fff !important; }
+    .status-returned {
+  background: #bb2222;
+  color: #fff;
+}
+
     .pending-badge { background: #e67e22;}
     .paid-badge { background: #007d37;}
     .cancelled-row td { background: #ffe9ea; }
@@ -87,11 +92,16 @@
         itemsForSeller.every(item =>
           (item.delivery_status === "cancelled" || item.status === "cancelled")
         );
-
+// Check if all items are returned
+const allReturned = itemsForSeller.length > 0 &&
+  itemsForSeller.every(item =>
+    (item.delivery_status === "returned" || item.status === "returned")
+  );
       const itemCodes = itemsForSeller.map(item => item.hsn_code || '-').join(', ');
       // For status, show as cancelled if all are cancelled, else show delivered or pending
       let mainStatus = "pending";
       if (allCancelled) mainStatus = "cancelled";
+    else if (allReturned) mainStatus = "returned";
       else if (itemsForSeller.every(i => i.delivery_status === "delivered")) mainStatus = "delivered";
       // Badge
       let statusHtml = `<span class="delivery-status-badge status-${mainStatus}">${mainStatus.charAt(0).toUpperCase()+mainStatus.slice(1)}</span>`;
@@ -111,7 +121,7 @@
       const actionTd = tr.querySelector('td:last-child');
 
       // Only show Delivery Details if NOT all cancelled
-      if (!allCancelled) {
+      if (!allCancelled && !allReturned) {
         const deliveryBtn = document.createElement('button');
         deliveryBtn.className = 'btn-delivery-info';
         deliveryBtn.textContent = 'Delivery Details';

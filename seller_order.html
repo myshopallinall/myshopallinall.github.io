@@ -155,7 +155,7 @@
         created_at,
         cod_paid,
         cod_payment_status,
-        profiles:customer_id(name, address, email, phone),
+        profiles:customer_id(name, address1, email, phone),
         order_items(
           id,
           product_id,
@@ -170,7 +170,7 @@
           courier_tracking_number,
           courier_tracking_url,
           products(name, seller_id),
-          profiles_seller: seller_id(id, name, address, email, gst_number, pan_number, phone)
+          profiles_seller: seller_id(id, name, address1, email, gst_number, pan_number, phone)
         )
       `)
       .order('created_at', { ascending: false });
@@ -247,8 +247,8 @@
       <div><strong>Customer Name:</strong> ${order.profiles.name || ''}</div>
       <div><strong>Email:</strong> ${order.profiles.email || ''}</div>
       <div><strong>Phone:</strong> ${order.profiles.phone || '-'}</div>
-      <div><strong>Address:</strong> ${order.profiles.address || ''}</div>
-      <hr>
+      <div><strong>Address:</strong> ${formatAddress(order.profiles)}</div>
+    <hr>
       <table border="1" cellpadding="4" cellspacing="0" width="100%">
         <thead>
           <tr>
@@ -387,6 +387,19 @@ if (statusText !== "delivered" && statusText !== "cancelled") { // Don't allow c
       document.getElementById('tracking-modal').style.display = 'none';
     }
   });
+function formatAddress(profile) {
+  if (!profile) return '';
+  return [
+    profile.address1,
+    profile.address2,
+    profile.landmark,
+    profile.village,
+    profile.town_city,
+    profile.district,
+    profile.state,
+    profile.pincode
+  ].filter(Boolean).join(', ');
+}
 
   function closeTracking() { document.getElementById('tracking-modal').style.display = 'none'; }
   function closeInvoice() { document.getElementById('invoice-modal').style.display = 'none'; }
@@ -404,29 +417,31 @@ if (statusText !== "delivered" && statusText !== "cancelled") { // Don't allow c
     printWindow.print();
   }
 
-  async function showInvoice(orderId, sellerId) {
+ async function showInvoice(orderId, sellerId) {
   const { data: order, error } = await supabase.from('orders')
     .select(`
       id,
       total,
       status,
       created_at,
-      profiles:customer_id(name, address, email, phone),
-      order_items(
-        quantity,
-        price,
-        gst_rate,
-        hsn_code,
-        status,
-        delivery_status,
-        cod_payment_status,
-        courier_name,
-        courier_tracking_number,
-        courier_tracking_url,
-        products(name, seller_id),
-        profiles_seller: seller_id(id, name, address, email, gst_number, pan_number, phone)
-      )
-    `)
+      profiles:customer_id(name, address1,  address2, landmark, town_city, village, district, state, pincode, email, phone),
+    order_items(
+      id,
+      product_id,
+      quantity,
+      price,
+      hsn_code,
+      status,
+      delivery_status,
+      cod_paid,
+      cod_payment_status,
+      courier_name,
+      courier_tracking_number,
+      courier_tracking_url,
+      products(name, seller_id),
+      profiles_seller: seller_id(id, name, address1, address2, landmark, town_city, village, district, state, pincode, email, gst_number, pan_number, phone)
+    )
+  `)
     .eq('id', orderId)
     .single();
 
@@ -438,8 +453,16 @@ if (statusText !== "delivered" && statusText !== "cancelled") { // Don't allow c
   const filteredItems = order.order_items.filter(
     item => item.profiles_seller && item.profiles_seller.id === sellerId
   );
-
   let sellerInfo = filteredItems[0]?.profiles_seller || {};
+
+  // Determine if IGST should apply by comparing seller state and customer state
+  let interState = false;
+  const customerState = order.profiles?.state?.toLowerCase() || '';
+  const sellerState = sellerInfo.state?.toLowerCase() || '';
+  if (customerState && sellerState && customerState !== sellerState) {
+    interState = true; // Inter-state sale → IGST
+  }
+
   let statusDisplay = (order.status === 'delivered')
     ? '<span style="color:green;font-weight:bold;">Delivered & Paid</span>'
     : order.status.charAt(0).toUpperCase() + order.status.slice(1);
@@ -479,20 +502,31 @@ if (statusText !== "delivered" && statusText !== "cancelled") { // Don't allow c
     <div>Name: ${sellerInfo.name || ''}</div>
     <div>Email: ${sellerInfo.email || ''}</div>
     <div>Phone: ${sellerInfo.phone || '-'}</div>
-    <div>Address: ${sellerInfo.address || ''}</div>
-    <div>GST Number: ${sellerInfo.gst_number || ''}</div>
+   <div>Address: ${formatAddress(sellerInfo)}</div>
+   <div>GST Number: ${sellerInfo.gst_number || ''}</div>
     <div>PAN Number: ${sellerInfo.pan_number || ''}</div>
     <hr>
     <h4>Customer Info</h4>
     <div>Name: ${order.profiles.name || ''}</div>
     <div>Email: ${order.profiles.email || ''}</div>
     <div>Phone: ${order.profiles.phone || '-'}</div>
-    <div>Address: ${order.profiles.address || ''}</div>
+   <div>Address: ${formatAddress(order.profiles)}</div>
     <hr>
     <table border="1" cellpadding="4" cellspacing="0" width="100%">
       <thead>
         <tr>
-          <th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th><th>Total</th><th>CGST</th><th>SGST</th><th>Delivery Status</th><th>Payment (COD)</th><th>Tracking Info</th>
+          <th>Product</th><th>HSN Code</th><th>Qty</th><th>Unit Price</th><th>Total</th>
+  `;
+
+  // Show IGST column or CGST + SGST columns conditionally
+  if (interState) {
+    html += `<th>IGST</th>`;
+  } else {
+    html += `<th>CGST</th><th>SGST</th>`;
+  }
+
+  html += `
+          <th>Delivery Status</th><th>Payment (COD)</th><th>Tracking Info</th>
         </tr>
       </thead>
       <tbody>
@@ -501,65 +535,82 @@ if (statusText !== "delivered" && statusText !== "cancelled") { // Don't allow c
   let grandTotal = 0;
   let totalCGST = 0;
   let totalSGST = 0;
+  let totalIGST = 0;
 
   filteredItems.forEach(item => {
-  let prodStatusClass = "prod-status-ind";
-  let statusText = (item.delivery_status || item.status || "pending");
-  if (DELIVERY_STATUSES.includes(statusText)) prodStatusClass += ` prod-status-${statusText}`;
-  else prodStatusClass += ` prod-status-pending`;
+    let prodStatusClass = "prod-status-ind";
+    let statusText = (item.delivery_status || item.status || "pending");
+    if (DELIVERY_STATUSES.includes(statusText)) prodStatusClass += ` prod-status-${statusText}`;
+    else prodStatusClass += ` prod-status-pending`;
 
-  const qty = item.quantity;
-  const priceIncGST = item.price;  // price inclusive GST
-  const gstRate = item.gst_rate || 0;
+    const qty = item.quantity;
+    const priceIncGST = item.price;  // price inclusive GST
+    const gstRate = item.gst_rate || 0;
 
-  // Calculate base price and GST
-  const basePrice = priceIncGST / (1 + gstRate / 100);
-  const gstPerUnit = priceIncGST - basePrice;
+    // Calculate base price and GST
+    const basePrice = priceIncGST / (1 + gstRate / 100);
+    const gstPerUnit = priceIncGST - basePrice;
 
-  const lineTotalIncGST = priceIncGST * qty;
-  const lineBaseTotal = basePrice * qty;
-  const gstTotal = gstPerUnit * qty;
-  const cgst = gstTotal / 2;
-  const sgst = gstTotal / 2;
+    const lineTotalIncGST = priceIncGST * qty;
+    const lineBaseTotal = basePrice * qty;
+    const gstTotal = gstPerUnit * qty;
 
-  grandTotal += lineBaseTotal;
-  totalCGST += cgst;
-  totalSGST += sgst;
+    grandTotal += lineBaseTotal;
 
-  let paymentBadge = (item.cod_payment_status === "paid")
-    ? '<span class="paid-badge">COD Paid</span>'
-    : '<span class="cod-badge">COD Pending</span>';
+    let taxHtml = '';
+    if (interState) {
+      totalIGST += gstTotal;
+      taxHtml = `<td>₹${gstTotal.toFixed(2)}</td>`;
+    } else {
+      const cgst = gstTotal / 2;
+      const sgst = gstTotal / 2;
+      totalCGST += cgst;
+      totalSGST += sgst;
+      taxHtml = `<td>₹${cgst.toFixed(2)}</td><td>₹${sgst.toFixed(2)}</td>`;
+    }
 
-  let trackingHtml = '-';
-  if (item.courier_tracking_number) {
-    let trackingLink = item.courier_tracking_url ?
-      `<a href="${item.courier_tracking_url}" target="_blank" rel="noopener" class="tracking-link">${item.courier_tracking_number}</a>`
-      : item.courier_tracking_number;
-    trackingHtml = `${item.courier_name || ''}<br>${trackingLink}`;
+    let paymentBadge = (item.cod_payment_status === "paid")
+      ? '<span class="paid-badge">COD Paid</span>'
+      : '<span class="cod-badge">COD Pending</span>';
+
+    let trackingHtml = '-';
+    if (item.courier_tracking_number) {
+      let trackingLink = item.courier_tracking_url ?
+        `<a href="${item.courier_tracking_url}" target="_blank" rel="noopener" class="tracking-link">${item.courier_tracking_number}</a>`
+        : item.courier_tracking_number;
+      trackingHtml = `${item.courier_name || ''}<br>${trackingLink}`;
+    }
+
+    html += `<tr>
+      <td>${item.products.name}</td>
+      <td>${item.hsn_code || '-'}</td>
+      <td>${qty}</td>
+      <td>₹${priceIncGST.toFixed(2)}</td>
+      <td>₹${lineTotalIncGST.toFixed(2)}</td>
+      ${taxHtml}
+      <td><span class="${prodStatusClass}">${statusText.charAt(0).toUpperCase() + statusText.slice(1)}</span></td>
+      <td>${paymentBadge}</td>
+      <td>${trackingHtml}</td>
+    </tr>`;
+  });
+
+  html += `</tbody></table><hr>`;
+
+  html += `<h3>Sub Total (Excl. GST): ₹${grandTotal.toFixed(2)}</h3>`;
+
+  if (interState) {
+    html += `<h3>Total IGST: ₹${totalIGST.toFixed(2)}</h3>`;
+    html += `<h3>Grand Total (Incl. GST): ₹${(grandTotal + totalIGST).toFixed(2)}</h3>`;
+  } else {
+    html += `<h3>Total CGST: ₹${totalCGST.toFixed(2)}</h3>`;
+    html += `<h3>Total SGST: ₹${totalSGST.toFixed(2)}</h3>`;
+    html += `<h3>Grand Total (Incl. GST): ₹${(grandTotal + totalCGST + totalSGST).toFixed(2)}</h3>`;
   }
-
-  html += `<tr>
-    <td>${item.products.name}</td>
-    <td>${item.hsn_code || '-'}</td>
-    <td>${qty}</td>
-    <td>₹${priceIncGST.toFixed(2)}</td>
-    <td>₹${lineTotalIncGST.toFixed(2)}</td>
-    <td>₹${cgst.toFixed(2)}</td>
-    <td>₹${sgst.toFixed(2)}</td>
-    <td><span class="${prodStatusClass}">${statusText.charAt(0).toUpperCase()+statusText.slice(1)}</span></td>
-    <td>${paymentBadge}</td>
-    <td>${trackingHtml}</td>
-  </tr>`;
-});
-html += `</tbody></table><hr>
-  <h3>Sub Total (Excl. GST): ₹${grandTotal.toFixed(2)}</h3>
-  <h3>Total CGST: ₹${totalCGST.toFixed(2)}</h3>
-  <h3>Total SGST: ₹${totalSGST.toFixed(2)}</h3>
-  <h3>Grand Total (Incl. GST): ₹${(grandTotal + totalCGST + totalSGST).toFixed(2)}</h3>`;
 
   document.getElementById('invoice-html').innerHTML = html;
   document.getElementById('invoice-modal').style.display = 'block';
 }
+
 
   document.getElementById('close-invoice').onclick = closeInvoice;
   document.getElementById('modal-extra-close-btn').onclick = closeInvoice;

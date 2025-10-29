@@ -8,7 +8,7 @@
     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f2f5fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
     #profile-form { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 480px; width: 100%; }
     #profile-form h2 { margin-bottom: 1rem; color: #0070f3; text-align: center; }
-    input, button { width: 100%; padding: 0.8rem; margin: 0.5rem 0 1rem 0; border-radius: 6px; border: 1.5px solid #ddd; font-size: 1rem; }
+    input, select, button { width: 100%; padding: 0.8rem; margin: 0.5rem 0 1rem 0; border-radius: 6px; border: 1.5px solid #ddd; font-size: 1rem; }
     button { background-color: #0070f3; color: white; font-weight: bold; border: none; cursor: pointer; transition: background-color 0.25s ease; }
     button:hover { background-color: #005bb5; }
     #delete-account-btn { background-color: #e74c3c; margin-top: 0.3rem; }
@@ -24,7 +24,27 @@
   <div id="message" class="message"></div>
   <input type="text" id="name" placeholder="Name" required />
   <input type="email" id="email" placeholder="Email" disabled />
-  <input type="text" id="address" placeholder="Address" />
+
+  <!-- Address parts -->
+  <input type="text" id="address1" placeholder="Flat/House No/Building/Company/Apartment" />
+  <input type="text" id="address2" placeholder="Area/Street/Sector/Village" />
+  <input type="text" id="landmark" placeholder="Landmark" />
+  <input type="text" id="town_city" placeholder="Town/City" />
+  <input
+          type="text"
+          id="pincode"
+          placeholder="Pincode"
+          maxlength="6"
+          pattern="\d{6}"
+          inputmode="numeric"
+          title="Please enter a 6-digit numeric pincode"
+  />
+
+  <!-- Changed from dropdowns to input -->
+  <input type="text" id="district" placeholder="District" />
+  <input type="text" id="state" placeholder="State" readonly />
+  <input type="text" id="village" placeholder="Village" />
+
   <input type="tel" id="phone" placeholder="Phone" />
   <input type="text" id="gst_number" placeholder="GST Number (for sellers)" required />
   <input type="text" id="pan_number" placeholder="PAN Number (for sellers)" required />
@@ -41,10 +61,49 @@
 
   const form = document.getElementById('profile-form');
   const messageDiv = document.getElementById('message');
+  let userRole = '';
+
+  // Elements
   const gstInput = document.getElementById('gst_number');
   const panInput = document.getElementById('pan_number');
   const deleteBtn = document.getElementById('delete-account-btn');
-  let userRole = '';
+
+  const pincodeInput = document.getElementById('pincode');
+  const districtInput = document.getElementById('district');
+  const stateInput = document.getElementById('state');
+  const villageInput = document.getElementById('village');
+
+  // Fetch district, state and village by pincode (India)
+  async function fetchDistrictStateVillageByPincode(pincode) {
+    if (pincode.length !== 6 || isNaN(pincode)) {
+      districtInput.value = '';
+      stateInput.value = '';
+      villageInput.value = '';
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+      const result = await response.json();
+      if (result[0].Status === "Success") {
+        // Often multiple post offices - take first
+        const postOffice = result[0].PostOffice[0];
+
+        districtInput.value = postOffice.District || '';
+        stateInput.value = postOffice.State || '';
+        villageInput.value = postOffice.Name || '';
+      } else {
+        districtInput.value = '';
+        stateInput.value = '';
+        villageInput.value = '';
+      }
+    } catch (error) {
+      console.error('Pincode lookup failed', error);
+      districtInput.value = '';
+      stateInput.value = '';
+      villageInput.value = '';
+    }
+  }
 
   async function loadProfile() {
     const { data: { user }} = await supabase.auth.getUser();
@@ -56,7 +115,7 @@
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('name, email, address, phone, gst_number, pan_number, role')
+      .select('name, email, address1, address2, landmark, town_city, pincode, district, state, village, phone, gst_number, pan_number, role')
       .eq('id', user.id)
       .single();
 
@@ -68,12 +127,23 @@
 
     document.getElementById('name').value = data.name || '';
     document.getElementById('email').value = data.email || '';
-    document.getElementById('address').value = data.address || '';
+
+    document.getElementById('address1').value = data.address1 || '';
+    document.getElementById('address2').value = data.address2 || '';
+    document.getElementById('landmark').value = data.landmark || '';
+    document.getElementById('town_city').value = data.town_city || '';
+    pincodeInput.value = data.pincode || '';
+
+    districtInput.value = data.district || '';
+    stateInput.value = data.state || '';
+    villageInput.value = data.village || '';
+
+    userRole = data.role;
+
     document.getElementById('phone').value = data.phone || '';
     gstInput.value = data.gst_number || '';
     panInput.value = data.pan_number || '';
 
-    userRole = data.role;
     if (userRole !== 'seller') {
       gstInput.required = false;
       panInput.required = false;
@@ -97,12 +167,18 @@
     }
 
     const name = document.getElementById('name').value.trim();
-    const address = document.getElementById('address').value.trim();
+    const address1 = document.getElementById('address1').value.trim();
+    const address2 = document.getElementById('address2').value.trim();
+    const landmark = document.getElementById('landmark').value.trim();
+    const town_city = document.getElementById('town_city').value.trim();
+    const pincode = pincodeInput.value.trim();
+    const district = districtInput.value.trim();
+    const state = stateInput.value.trim();
+    const village = villageInput.value.trim();
     const phone = document.getElementById('phone').value.trim();
     const gst_number = gstInput.value.trim();
     const pan_number = panInput.value.trim();
 
-    // Basic validation for GST/PAN if visible and required
     if (userRole === 'seller') {
       if (!gst_number) {
         messageDiv.textContent = 'GST Number is required for sellers';
@@ -116,10 +192,36 @@
       }
     }
 
+    if (pincode && (pincode.length !== 6 || isNaN(pincode))) {
+      messageDiv.textContent = 'Please enter a valid 6-digit Pincode';
+      messageDiv.className = 'message error';
+      return;
+    }
+
+    // Note: District and State manual edits are allowed, so minimal validation.
+    if (!district) {
+      messageDiv.textContent = 'Please enter District';
+      messageDiv.className = 'message error';
+      return;
+    }
+
+    if (!state) {
+      messageDiv.textContent = 'Please enter State';
+      messageDiv.className = 'message error';
+      return;
+    }
+
     const { error } = await supabase.from('profiles').upsert({
       id: user.id,
       name,
-      address,
+      address1,
+      address2,
+      landmark,
+      town_city,
+      pincode,
+      district,
+      state,
+      village,
       phone,
       gst_number: gst_number || null,
       pan_number: pan_number || null
@@ -134,10 +236,13 @@
     }
   };
 
-  // Add event for account deletion
   deleteBtn.onclick = function() {
     window.location.href = 'account_delete.html';
   };
+
+  pincodeInput.addEventListener('blur', () => {
+    fetchDistrictStateVillageByPincode(pincodeInput.value.trim());
+  });
 
   window.onload = loadProfile;
 </script>

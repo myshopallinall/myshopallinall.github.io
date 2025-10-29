@@ -369,7 +369,12 @@ document.addEventListener('keydown', function(e){
     if (!productData || productData.stock <= 0) return alert("Product out of stock!");
     const qty = parseInt(document.getElementById('quantityInput').value) || 1;
     const { data: user } = await supabase.auth.getUser();
-    if (!user.user) return alert("Please login first.");
+    if (!user.user)
+
+    {  alert("Please login first to add products to cart.");
+    window.location.href = "login.html";
+    return;
+    }
     customerId = user.user.id;
     await supabase.from('cart').insert([{ customer_id: customerId, product_id: productId, quantity: qty }]);
     alert('Product added to cart!');

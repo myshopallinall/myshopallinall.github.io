@@ -409,6 +409,21 @@
     <label class="option-label"><input type="checkbox" id="accept-cod" checked /> Accept COD</label>
     <label class="option-label"><input type="checkbox" id="accept-online" checked /> Accept Online Payment</label>
   </div>
+  <label>Delivery Locations (Multiple Pincodes)</label>
+  <form id="delivery-location-form" style="display:flex; gap:8px; margin-bottom:10px;">
+    <input
+            type="text"
+            id="delivery-pincode-input"
+            placeholder="Enter 6-digit pincode"
+            maxlength="6"
+            pattern="\d{6}"
+            inputmode="numeric"
+            title="Enter a valid 6-digit pincode"
+    />
+    <button type="button" id="add-pincode-btn">Add</button>
+
+  <ul id="delivery-pincode-list" style="list-style: disc inside; margin-top:0; padding-left:10px;"></ul>
+
   <button type="submit">Add Product</button>
   <button type="button" id="cancel-edit-btn" class="cancel-edit-btn" style="display:none;">Cancel Edit</button>
 </form>
@@ -458,6 +473,54 @@ const dimensions = {
   setInterval(checkNewOrdersPopup, 2000);
   let sellerId = null, selectedFiles = [], existingImages = [];
   let allCategoriesList = [];
+let deliveryPincodes = new Set();
+
+const deliveryPincodeInput = document.getElementById('delivery-pincode-input');
+const deliveryPincodeList = document.getElementById('delivery-pincode-list');
+
+function renderDeliveryPincodes() {
+  deliveryPincodeList.innerHTML = '';
+  if (deliveryPincodes.size === 0) {
+    deliveryPincodeList.innerHTML = '<li>No delivery pincodes added.</li>';
+    return;
+  }
+  deliveryPincodes.forEach(pin => {
+    const li = document.createElement('li');
+    li.textContent = pin;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.textContent = 'Remove';
+    removeBtn.style.marginLeft = '10px';
+    removeBtn.onclick = () => {
+      deliveryPincodes.delete(pin);
+      renderDeliveryPincodes();
+    };
+
+    li.appendChild(removeBtn);
+    deliveryPincodeList.appendChild(li);
+  });
+}
+
+function isValidPincode(pin) {
+  return /^\d{6}$/.test(pin);
+}
+
+document.getElementById('add-pincode-btn').onclick = () => {
+  const val = deliveryPincodeInput.value.trim();
+  if (!isValidPincode(val)) {
+    alert('Please enter a valid 6-digit pincode');
+    return;
+  }
+  if (deliveryPincodes.has(val)) {
+    alert('Pincode already added');
+    return;
+  }
+  deliveryPincodes.add(val);
+  deliveryPincodeInput.value = '';
+  renderDeliveryPincodes();
+};
+
+renderDeliveryPincodes();
 
   async function getUser() {
     const { data } = await supabase.auth.getUser();
@@ -703,6 +766,7 @@ const prodId = document.getElementById('prod-id').value;
     gst_rate: gstRate,
     mrp: mrpPrice,
     image_url: imageUrls.length ? JSON.stringify(imageUrls) : null,
+    delivery_location: Array.from(deliveryPincodes)
   };
 
   if (prodId) {
@@ -841,6 +905,13 @@ if (prod.dimensions) {
     document.querySelector('#product-form button[type=submit]').textContent = 'Update Product';
     document.getElementById('accept-cod').checked = Boolean(prod.accept_cod);
     document.getElementById('accept-online').checked = Boolean(prod.accept_online_payment);
+try {
+  const deliveryLocs = prod.delivery_location || [];
+  deliveryPincodes = new Set(deliveryLocs);
+} catch {
+  deliveryPincodes = new Set();
+}
+renderDeliveryPincodes();
 
 
     try {

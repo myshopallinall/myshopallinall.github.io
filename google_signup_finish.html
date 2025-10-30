@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Google Sign Up - MyShop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f2f5fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    #finish-message { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 6px 15px rgba(0,0,0,0.1); max-width: 360px; width: 100%; text-align: center;}
+    .success { color: #27ae60; }
+    .error { color: #e74c3c; }
+  </style>
+</head>
+<body>
+<div id="finish-message">Finishing Google sign up...</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+  const msg = document.getElementById('finish-message');
+
+  (async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not found after Google sign up.");
+      // Create or update profile as customer
+      await supabase.from('profiles').upsert({
+        id: user.id,
+        name: user.user_metadata.full_name || user.user_metadata.name || user.email,
+        email: user.email,
+        role: "customer",
+        created_at: new Date()
+      });
+      msg.innerHTML = '<div class="success">Sign up complete! Redirecting...</div>';
+      setTimeout(() => { window.location.href = "custdashboard.html"; }, 2200);
+    } catch (err) {
+      msg.innerHTML = '<div class="error">Sign up error: ' + err.message + '</div>';
+    }
+  })();
+</script>
+</body>
+</html>

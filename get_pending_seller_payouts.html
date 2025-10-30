@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Seller Payments - MyShop Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet"/>
+  <style>
+    body { background: #f6f7fa; font-family: 'Montserrat', Arial, Helvetica, sans-serif; margin: 0; padding-bottom: 40px;}
+    .container { max-width: 1200px; margin: 24px auto; background: #fff; border-radius: 10px; box-shadow: 0 5px 30px #dadada; padding: 28px 36px 32px; }
+    h1 { font-weight: 700; letter-spacing:1px; color:#232f3e; margin-bottom: 16px;text-align:center;}
+    .tabs { display: flex; gap: 18px; margin-bottom: 24px; justify-content: center;}
+    .tab-btn {
+      background:#eef2ff; outline:none; border: 2px solid #d3d5e2; color: #232f3e; font-weight:600;
+      padding: 9px 24px; border-radius: 22px; cursor: pointer; font-size:1.1rem;
+      transition: background 0.18s, border 0.18s;
+    }
+    .tab-btn.active { background: #0070f3; color:#fff; border-color: #0070f3;}
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px;}
+    th, td { padding: 13px 10px; border-bottom: 1px solid #e4e7ea; text-align: center; font-size:1rem;}
+    th { background: #f4f8fc; color: #313648; font-weight:700;}
+    tr:last-child td { border-bottom: none; }
+    .pay-status-paid { color: #078736; font-weight:600; }
+    .pay-status-unpaid { color: #ff9800; font-weight:600;}
+    .pay-btn { padding:8px 24px; background:#078736; color:#fff; border:none; border-radius:7px; font-weight:600; letter-spacing:0.5px; font-size:1rem; cursor:pointer;}
+    .pay-btn:disabled { background: #d5d5d5; color: #aaa; cursor: not-allowed;}
+    .pay-btn.processing { background:#f3b73a;color:#fff; }
+    .invoice-btn {padding:8px 15px;background:#0070f3;color:#fff;border:none;border-radius:5px;font-size:1rem;font-weight:600;cursor:pointer;margin-top:4px;}
+    .invoice-btn:hover {background:#004fcc;}
+    .spinner { display:inline-block; width: 21px; height: 21px; border: 3px solid #0070f3; border-radius: 50%; border-top: 3px solid #fff; animation: spin 1s linear infinite; vertical-align:middle;}
+    @keyframes spin { 0%{ transform:rotate(0);} 100%{transform:rotate(360deg);} }
+    .msg { text-align: center; margin: 18px 0 0 0; font-size:1.16rem;}
+    @media (max-width: 720px) {
+      .container { padding: 12px 4px; }
+      table, th, td { font-size:0.98rem;}
+      .tabs { gap:7px;}
+      .tab-btn { padding:6px 7px; font-size:0.98rem;}
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Seller Payments</h1>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="setPeriod('daily')">Daily</button>
+    <button class="tab-btn" onclick="setPeriod('weekly')">Weekly</button>
+    <button class="tab-btn" onclick="setPeriod('monthly')">Monthly</button>
+  </div>
+  <div id="payments-msg" class="msg"></div>
+  <table>
+    <thead>
+    <tr>
+      <th>Seller</th>
+      <th>Bank</th>
+      <th>IFSC</th>
+      <th>Account</th>
+      <th>Period</th>
+      <th>Total Sales (₹)</th>
+      <th>Commission (2%)</th>
+      <th>GST (18% on commission)</th>
+      <th>Net Payable (₹)</th>
+      <th>Status</th>
+      <th>Pay</th>
+      <th>Invoice</th>
+    </tr>
+    </thead>
+    <tbody id="seller-payments"></tbody>
+  </table>
+</div>
+
+<!-- Simple Invoice modal -->
+<div id="invoice-modal" style="display:none;position:fixed;top:8%;left:50%;transform:translateX(-50%);background:#fff;box-shadow:0 10px 30px #bbb;padding:32px 20px 14px 32px;border-radius:12px;max-width:450px;min-width:320px;">
+  <div style="text-align:right;"><button onclick="closeInvoice()" style="font-size:1.7rem;background:none;border:none;color:#e53935;cursor:pointer;">×</button></div>
+  <div id="invoice-content" style="padding:0 12px 10px 8px;"></div>
+  <div style="text-align:center;"><button onclick="printInvoice()" class="invoice-btn" style="margin-bottom:12px;">Print/Save PDF</button></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+  let currentPeriod = 'daily';
+  let periodRange = [];
+
+  function setPeriod(period) {
+    currentPeriod = period;
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.tab-btn')[['daily','weekly','monthly'].indexOf(period)].classList.add('active');
+    loadPayments();
+  }
+
+  function getPeriodRange() {
+    const now = new Date();
+    let start, end;
+    if (currentPeriod === 'daily') {
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      end = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    } else if (currentPeriod === 'weekly') {
+      const first = now.getDate() - now.getDay() + 1;
+      start = new Date(now.getFullYear(), now.getMonth(), first);
+      end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7);
+    } else if (currentPeriod === 'monthly') {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    }
+    periodRange = [start, end];
+    return [start, end];
+  }
+
+  async function loadPayments() {
+    const [periodStart, periodEnd] = getPeriodRange();
+    document.getElementById("payments-msg").textContent = '';
+    const tbody = document.getElementById('seller-payments');
+    tbody.innerHTML = `<tr><td colspan="12"><span class="spinner"></span> Loading...</td></tr>`;
+    try {
+      const { data: payouts, error } = await supabase
+        .rpc('get_pending_seller_payouts', {
+          period_start: periodStart.toISOString(),
+          period_end: periodEnd.toISOString()
+        });
+      tbody.innerHTML = '';
+      if (error) {
+        document.getElementById('payments-msg').textContent = error.message;
+        return;
+      }
+      if (!payouts || payouts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="12">No payouts found for this period.</td></tr>`;
+        return;
+      }
+      payouts.forEach(p => {
+        const commission = p.total_sales * 0.02;
+        const gst_on_commission = commission * 0.18;
+        const netPay = p.total_sales - commission - gst_on_commission;
+        const sellerLabel = `<strong>${p.seller_name}</strong><br/><small>${p.seller_id}</small>`;
+        tbody.innerHTML += `
+          <tr>
+            <td>${sellerLabel}</td>
+            <td>${p.bank_name || '-'}</td>
+            <td>${p.ifsc_code || '-'}</td>
+            <td>${p.bank_account || '-'}</td>
+            <td>${currentPeriod[0].toUpperCase() + currentPeriod.slice(1)}</td>
+            <td>₹${p.total_sales.toFixed(2)}</td>
+            <td>₹${commission.toFixed(2)}</td>
+            <td>₹${gst_on_commission.toFixed(2)}</td>
+            <td>₹${netPay.toFixed(2)}</td>
+            <td><span class="pay-status-unpaid">Unpaid</span></td>
+            <td>
+              <button class="pay-btn" onclick="paySeller('${p.seller_id}', ${netPay.toFixed(2)}, this)">Pay</button>
+            </td>
+            <td>
+              <button class="invoice-btn" onclick="generateInvoice('${p.seller_id}', '${p.seller_name}', '${p.bank_name}', '${p.bank_account}', '${p.ifsc_code}', ${p.total_sales}, ${commission}, ${gst_on_commission}, ${netPay}, '${currentPeriod[0].toUpperCase() + currentPeriod.slice(1)}')">Invoice</button>
+            </td>
+          </tr>
+        `;
+      });
+    } catch (err) {
+      document.getElementById("payments-msg").textContent = err.message;
+    }
+  }
+
+  window.paySeller = async function(sellerId, amount, btn) {
+    if (!confirm(`Pay ₹${amount} to seller ${sellerId}?`)) return;
+    btn.disabled = true;
+    btn.classList.add("processing");
+    btn.innerHTML = `<span class="spinner"></span> Paying...`;
+    await new Promise(res => setTimeout(res, 1400));
+    btn.classList.remove("processing");
+    btn.innerHTML = "Paid!";
+    btn.disabled = true;
+    document.getElementById("payments-msg").textContent = `Payment ₹${amount} to seller ${sellerId} marked as paid.`;
+    setTimeout(loadPayments, 2500);
+  };
+
+  // ===== INVOICE =====
+  window.generateInvoice = function(seller_id, seller_name, bank_name, account, ifsc, total, commission, gst, payout, period) {
+    const now = new Date();
+    const d = now.toLocaleString('en-IN');
+    const rangeStr = period === 'Daily'
+      ? now.toLocaleDateString('en-IN')
+      : (period === 'Weekly'
+        ? `${new Date(periodRange[0]).toLocaleDateString('en-IN')} - ${new Date(periodRange[1] - 1).toLocaleDateString('en-IN')}`
+        : `${now.toLocaleString('en-IN', { month:"long", year:"numeric" })}`);
+
+    document.getElementById('invoice-content').innerHTML = `
+      <h2 style="color:#0070f3;">Commission Invoice</h2>
+      <div style="margin-bottom:14px;"><strong>Date:</strong> ${d}</div>
+      <div><b>Seller:</b> ${seller_name}</div>
+      <div><b>Seller ID:</b> ${seller_id}</div>
+      <div><b>Bank:</b> ${bank_name}</div>
+      <div><b>Account No:</b> ${account}</div>
+      <div><b>IFSC:</b> ${ifsc}</div>
+      <div><b>Period:</b> ${rangeStr}</div>
+      <hr/>
+      <div><b>Total Sales:</b> ₹${total.toFixed(2)}</div>
+      <div><b>Commission (2%):</b> ₹${commission.toFixed(2)}</div>
+      <div><b>GST (18% on commission):</b> ₹${gst.toFixed(2)}</div>
+      <div><b>Net Payable to Seller:</b> ₹${payout.toFixed(2)}</div>
+      <hr/>
+      <div><b>Note:</b> The above commission and GST amount are charged by MyShop as per policy for facilitation of sales through our e-commerce platform.</div>
+      <div style="margin-top:10px;font-size:1.09rem;color:#444;">This is a system generated statement.</div>
+    `;
+    document.getElementById('invoice-modal').style.display = "block";
+  };
+  window.closeInvoice = function() {
+    document.getElementById('invoice-modal').style.display = "none";
+  };
+  window.printInvoice = function() {
+    const printWin = window.open('', '', 'height=570,width=520');
+    printWin.document.write('<html><head><title>Invoice - MyShop</title></head><body>');
+    printWin.document.write(document.getElementById('invoice-content').innerHTML);
+    printWin.document.write('</body></html>');
+    printWin.document.close();
+    printWin.print();
+  };
+
+  // Initial load
+  loadPayments();
+</script>
+</body>
+</html>

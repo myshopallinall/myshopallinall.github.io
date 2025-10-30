@@ -16,6 +16,9 @@
     .link { color: #0070f3; text-align: right; font-size: 0.98rem; margin-bottom: 0.6rem; text-decoration: underline; cursor: pointer; }
     #agreement-container { display: none; margin-bottom: 1rem; font-size: 0.9rem; }
     #agreement-container label { cursor: pointer; }
+ #google-signup-btn { background: white; color: #222; border: 1.5px solid #ddd; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 8px; }
+    #google-signup-btn img { width: 22px; vertical-align: middle; }
+
   </style>
 </head>
 <body>
@@ -36,6 +39,15 @@
     <label for="acceptAgreement">I have read and accept the <a href="seller_agreement.html" target="_blank">Seller Agreement & Policies</a>.</label>
   </div>
   <button type="submit" id="submitButton" disabled>Sign Up</button>
+  <div style="margin: 1.6rem 0 0.7rem; text-align:center; color:#aaa;">— OR —</div>
+  <button type="button" id="google-signup-btn">
+    <img src="https://www.svgrepo.com/show/355037/google.svg" alt="Google" />
+    Sign Up with Google
+  </button>
+  <div style="font-size:0.93rem; color:#444;text-align:center; margin-top:8px;">
+    Note: Google signup will create a customer account only.<br>Sellers must use email registration.
+  </div>
+
   <div class="link" onclick="window.location.href='login.html'">Already have an account? Login</div>
 </form>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -54,6 +66,7 @@
     const agreementContainer = document.getElementById('agreement-container');
     const acceptAgreement = document.getElementById('acceptAgreement');
     const submitButton = document.getElementById('submitButton');
+ const googleBtn = document.getElementById('google-signup-btn');
 
     // GST regex for 15 chars with India format
     function isValidGST(gst) {
@@ -173,6 +186,21 @@
         messageDiv.className = 'error';
       }
     };
+  };
+
+   googleBtn.onclick = async function() {
+    // Redirect to this page after OAuth
+    const redirectUrl = window.location.origin + "/google_signup_finish.html";
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: redirectUrl }
+      });
+      if (error) throw error;
+    } catch (err) {
+      messageDiv.textContent = "Google sign-up error: " + err.message;
+      messageDiv.className = 'error';
+    }
   };
 </script>
 </body>

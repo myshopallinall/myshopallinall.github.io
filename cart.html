@@ -106,38 +106,18 @@
    .remove-btn:hover {
      background: #b91c1c;
    }
-   .summary {
-     margin-top: 1.6rem;
-     text-align: right;
-     font-size: 1rem;
-     font-weight: 600;
-     color: #111827;
-   }
-   .total-box {
-     font-size: 1.25rem;
-     font-weight: 700;
-     background: #0070f3;
+   .pay-btn {
+     background: #10b981;
      color: #fff;
-     display: inline-block;
-     padding: 10px 18px;
-     border-radius: 6px;
-     margin-bottom: 15px;
-   }
-   .place-order-btn {
-     background: linear-gradient(90deg, #e91e63 0%, #f43f5e 100%);
-     color: white;
-     font-weight: 700;
-     font-size: 1.1rem;
-     padding: 12px 34px;
      border: none;
-     border-radius: 6px;
+     border-radius: 4px;
+     padding: 6px 12px;
      cursor: pointer;
-     transition: 0.3s;
-     box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+     transition: background 0.3s;
+     font-weight: 600;
    }
-   .place-order-btn:hover {
-     background: linear-gradient(90deg, #ff4081 0%, #ff1744 100%);
-     box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+   .pay-btn:hover {
+     background: #047857;
    }
    @media (max-width: 700px) {
      table, th, td {
@@ -146,7 +126,6 @@
      h2 {
        font-size: 1.5rem;
      }
-     .total-box, .place-order-btn { font-size: 1rem; }
    }
   </style>
 </head>
@@ -162,12 +141,6 @@
 <main>
   <h2>Your Cart</h2>
   <div id="cart-list" class="cart-container"></div>
-  <div class="summary">
-    <div id="total-section" style="display:none;">
-      <div class="total-box">Total: ₹<span id="cart-total">0</span></div><br/>
-      <button class="place-order-btn" onclick="startPayment()">Proceed to Pay</button>
-    </div>
-  </div>
 </main>
 
 <script>
@@ -176,7 +149,7 @@
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
   );
 
-  let customerId = null, latestCart = [], latestTotal = 0;
+  let customerId = null;
 
   checkLogin();
   async function checkLogin(){
@@ -192,36 +165,38 @@
 
   async function loadCart(){
     const { data, error } = await supabase.from('cart')
-      .select('id, product_id, quantity, products(name, price, seller_id, stock, accept_cod)')
+      .select('id, product_id, quantity, products(name, price, seller_id, stock, accept_cod, gst_rate)')
       .eq('customer_id', customerId);
 
     const container = document.getElementById('cart-list');
-    const totalSection = document.getElementById('total-section');
     if (error || !data || !data.length) {
       container.innerHTML = '<div class="cart-empty">Your cart is empty — add some items!</div>';
-      totalSection.style.display = 'none';
       return;
     }
 
     let html = `<table><thead><tr>
-      <th>Product</th><th>Price</th><th>Qty</th><th>Total</th><th>Remove</th>
+      <th>Product</th><th>Price</th><th>Qty</th><th>Total</th><th>Remove</th><th>Pay</th>
     </tr></thead><tbody>`;
     data.forEach(item => {
       html += `<tr>
         <td>${item.products?.name ?? '-'}</td>
         <td>₹${item.products?.price ?? '-'}</td>
         <td>${item.quantity}</td>
-        <td>₹${(item.products?.price ?? 0) * item.quantity}</td>
+        <td>₹${((item.products?.price ?? 0) * item.quantity).toFixed(2)}</td>
         <td><button class="remove-btn" onclick="removeFromCart('${item.id}')">Remove</button></td>
+        <td><button class="pay-btn" onclick="payForProduct(
+           '${item.id}',
+           ${item.products?.price},
+           ${item.quantity},
+           '${item.product_id}',
+           '${item.products?.seller_id}',
+           ${item.products?.gst_rate ?? 0},
+           ${item.products?.accept_cod ? 'true' : 'false'}
+        )">Buy</button></td>
       </tr>`;
     });
     html += '</tbody></table>';
     container.innerHTML = html;
-
-    latestCart = data;
-    latestTotal = data.reduce((sum, i) => sum + (i.products?.price ?? 0) * i.quantity, 0);
-    document.getElementById("cart-total").innerText = latestTotal.toFixed(2);
-    totalSection.style.display = 'block';
   }
 
   window.removeFromCart = async function(cartId){
@@ -229,35 +204,44 @@
     loadCart();
   };
 
-  window.startPayment = function(){
-    if (!latestCart.length || latestTotal === 0) return alert('Your cart is empty.');
+  async function payForProduct(cartId, price, quantity, productId, sellerId, gstRate, acceptCod) {
+    const totalAmount = price * quantity;
 
-    let codAllowed = latestCart.every(i => i.products.accept_cod);
-    if (codAllowed) {
-      if (confirm('COD available. Press OK for Cash on Delivery or Cancel for Online Payment.')) {
-        placeOrder(latestCart, latestTotal, null, 'cod');
-        return;
-      }
-    } else {
-      alert('COD not available for some items. Online payment only.');
+    if (totalAmount <= 0) {
+      alert('Invalid amount to pay.');
+      return;
     }
 
-    const options = {
-      key: 'rzp_live_RS6JXqKrLXCdOh',
-      amount: latestTotal * 100,
-      currency: 'INR',
-      name: 'MyShop',
-      description: 'Order Payment',
-      handler: response => {
-        placeOrder(latestCart, latestTotal, response.razorpay_payment_id, 'online');
-      },
-      theme: { color: '#0070f3' }
-    };
-    let rzp = new Razorpay(options);
-    rzp.open();
-  };
+    if (acceptCod) {
+      const useCod = confirm('Cash on Delivery is available for this product.\nPress OK for Cash on Delivery or Cancel for Online Payment.');
+      if (useCod) {
+        return placeOrderAndClearCart(cartId, price, quantity, productId, sellerId, gstRate, totalAmount, null, 'cod');
+      }
+    }
 
-async function placeOrder(cartItems, totalAmount, paymentId, paymentType) {
+    // Proceed to online payment
+    try {
+      const options = {
+        key: 'rzp_live_RS6JXqKrLXCdOh',
+        amount: totalAmount * 100,
+        currency: 'INR',
+        name: 'MyShop',
+        description: `Payment for ${quantity} pcs`,
+        handler: async function (response) {
+          await placeOrderAndClearCart(cartId, price, quantity, productId, sellerId, gstRate, totalAmount, response.razorpay_payment_id, 'online');
+        },
+        theme: {
+          color: '#0070f3'
+        }
+      };
+      const rzp = new Razorpay(options);
+      rzp.open();
+    } catch (error) {
+      alert('Payment initialization error: ' + error.message);
+    }
+  }
+
+  async function placeOrderAndClearCart(cartId, price, quantity, productId, sellerId, gstRate, totalAmount, paymentId, paymentType) {
     try {
       const orderStatus = paymentType === 'cod' ? 'pending' : 'paid';
       const { data: order, error: orderError } = await supabase
@@ -265,117 +249,36 @@ async function placeOrder(cartItems, totalAmount, paymentId, paymentType) {
         .insert([{ customer_id: customerId, total: totalAmount, payment_id: paymentId, status: orderStatus }])
         .select()
         .single();
+
       if (orderError) throw new Error(orderError.message);
 
-      // Insert order items and set gst_rate if missing from products table
-      let uniqueSellers = new Set();
-      for (let i of cartItems) {
-        let gstRateToUse = i.products.gst_rate;
-        if (gstRateToUse === null || gstRateToUse === undefined) {
-          // Fetch gst_rate from product just to be safe (though products fetched already have it)
-          const { data: prod, error: prodError } = await supabase
-            .from('products').select('gst_rate').eq('id', i.product_id).single();
-          if (!prodError && prod) {
-            gstRateToUse = prod.gst_rate;
-          }
-        }
-
-        await supabase.from('order_items').insert([{
-          order_id: order.id,
-          product_id: i.product_id,
-          seller_id: i.products.seller_id,
-          quantity: i.quantity,
-          price: i.products.price,
-          gst_rate: gstRateToUse,
-          status: 'pending'
-        }]);
-
-                const newStock = (i.products.stock || 0) - i.quantity;
-        if (newStock >= 0)
-          await supabase.from('products').update({ stock: newStock }).eq('id', i.product_id);
-
-        if (i.products.seller_id) {
-          uniqueSellers.add(i.products.seller_id);
-        }
-      }
-      await supabase.from('cart').delete().eq('customer_id', customerId);
-
-      await sendOrderNotifications(order.id, customerId, Array.from(uniqueSellers), totalAmount, paymentType);
-
-      alert(`Order placed successfully (${paymentType === 'cod' ? 'COD' : 'Online Payment'})`);
-      loadCart();
-    } catch (err) {
-      alert('Order Error: ' + err.message);
-    }
-  }
-
-  // Function to send notifications & emails
-  async function sendOrderNotifications(orderId, customerId, sellerIds, totalAmount, paymentType) {
-    try {
-      // Get customer info
-      const { data: customerProfile } = await supabase
-        .from('profiles')
-        .select('email, name')
-        .eq('id', customerId)
-        .single();
-      const customerEmail = customerProfile?.email;
-      const customerName = customerProfile?.name || "Customer";
-
-      await supabase.from('notifications').insert([{
-        user_id: customerId,
-        email: customerEmail,
-        title: 'Order Confirmation',
-        message: `Hi ${customerName}, your order #${orderId} has been placed successfully for ₹${totalAmount} via ${paymentType === 'cod' ? 'Cash on Delivery' : 'Online Payment'}.`,
-        type: 'order_placed',
-        order_id: orderId,
-        created_at: new Date().toISOString()
+      const { error: orderItemError } = await supabase.from('order_items').insert([{
+        order_id: order.id,
+        product_id: productId,
+        seller_id: sellerId,
+        quantity: quantity,
+        price: price,
+        gst_rate: gstRate,
+        status: paymentType === 'cod' ? 'pending' : 'confirmed'
       }]);
 
-      // Send real email using Edge Function
-      if (customerEmail) {
-        await fetch('https://wamqheltqmufuzrqlxlb.functions.supabase.co/sendEmail', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: customerEmail,
-            title: 'Order Confirmation',
-            message: `Hi ${customerName}, your order #${orderId} has been placed successfully for ₹${totalAmount} via ${paymentType === 'cod' ? 'Cash on Delivery' : 'Online Payment'}.`
-          })
-        });
+      if (orderItemError) throw new Error(orderItemError.message);
+
+      // Update stock
+      const stockRes = await supabase.from('products').select('stock').eq('id', productId).single();
+      let currentStock = stockRes.data?.stock ?? 0;
+      const newStock = currentStock - quantity;
+      if (newStock >= 0) {
+        await supabase.from('products').update({ stock: newStock }).eq('id', productId);
       }
 
-      // Notifications and emails to all sellers
-      for (const sellerId of sellerIds) {
-        const { data: sellerProfile } = await supabase
-          .from('profiles').select('email, name').eq('id', sellerId).single();
-        const sellerEmail = sellerProfile?.email;
-        const sellerName = sellerProfile?.name || "Seller";
+      // Remove item from cart
+      await supabase.from('cart').delete().eq('id', cartId);
 
-        await supabase.from('notifications').insert([{
-          user_id: sellerId,
-          email: sellerEmail,
-          title: 'New Order Received!',
-          message: `Hi ${sellerName}, you have received a new order #${orderId} from ${customerName} for ₹${totalAmount} via ${paymentType === 'cod' ? 'COD' : 'Online Payment'}.`,
-          type: 'new_order',
-          order_id: orderId,
-          created_at: new Date().toISOString()
-        }]);
-
-        // Send seller email
-        if (sellerEmail) {
-          await fetch('https://wamqheltqmufuzrqlxlb.functions.supabase.co/sendEmail', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: sellerEmail,
-              title: 'New Order Received!',
-              message: `Hi ${sellerName}, you have received a new order #${orderId} from ${customerName} for ₹${totalAmount} via ${paymentType === 'cod' ? 'COD' : 'Online Payment'}.`
-            })
-          });
-        }
-      }
+      alert(`Order placed successfully (${paymentType === 'cod' ? 'Cash on Delivery' : 'Online Payment'})`);
+      loadCart();
     } catch (error) {
-      console.error('Order notification/email error:', error);
+      alert('Order error: ' + error.message);
     }
   }
 

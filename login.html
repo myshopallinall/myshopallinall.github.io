@@ -235,15 +235,18 @@
       }
     };
 
-    // Google OAuth login button handler
     document.getElementById('google-login').onclick = async function () {
-      try {
-        const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-        if (error) throw error;
-      } catch (err) {
-        alert('Google OAuth error: ' + err.message);
-      }
-    };
+  try {
+    const redirectTo = 'https://myshopallinall.github.io/google_signup_finish.html';
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo }
+    });
+    if (error) throw error;
+  } catch (err) {
+    alert('Google OAuth error: ' + err.message);
+  }
+};
 
    // Forgot password modal handlers
 

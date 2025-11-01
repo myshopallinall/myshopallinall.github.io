@@ -42,14 +42,15 @@
     let fullName = user.user_metadata?.full_name || user.user_metadata?.name || user.email || "No Name";
     try {
       const { error: upsertError } = await supabase.from('profiles').upsert({
-        id: user.id,
-        name: fullName,
-        email: user.email,
-        role: "customer",
-        gst_number: "MANDATORY_UPDATE",
-        pan_number: "MANDATORY_UPDATE",
-        created_at: new Date()
-      });
+  id: user.id,
+  name: fullName,
+  email: user.email,
+  role: "customer", // <-- KEY!
+  gst_number: "MANDATORY_UPDATE",
+  pan_number: "MANDATORY_UPDATE",
+  created_at: new Date()
+});
+
       if (upsertError) throw upsertError;
       msg.innerHTML = '<div class="success">Google signup complete! Redirecting to dashboard…</div>';
       setTimeout(() => window.location.href = "custdashboard.html", 2200);

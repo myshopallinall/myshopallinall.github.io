@@ -159,7 +159,7 @@
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
 
-        await supabase.from('profiles').insert([{
+          await supabase.from('profiles').insert([{
           id: data.user.id,
           name,
           email,

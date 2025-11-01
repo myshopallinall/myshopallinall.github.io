@@ -21,22 +21,40 @@
   );
   const msg = document.getElementById('finish-message');
 
+  // Utility to repeatedly ensure auth session restoration
+  async function getUserSessionWithRetry(retries = 10, interval = 400) {
+    for (let i = 0; i < retries; i++) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session && session.user) return session.user;
+      await new Promise(res => setTimeout(res, interval));
+    }
+    return null;
+  }
+
   (async () => {
+    msg.textContent = "Checking sign up status...";
+    let user = await getUserSessionWithRetry();
+    if (!user) {
+      msg.innerHTML = '<div class="error">Google sign up was NOT completed. Please try again or check your provider settings.</div>';
+      return;
+    }
+
+    let fullName = user.user_metadata?.full_name || user.user_metadata?.name || user.email || "No Name";
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not found after Google sign up.");
-      // Create or update profile as customer
-      await supabase.from('profiles').upsert({
+      const { error: upsertError } = await supabase.from('profiles').upsert({
         id: user.id,
-        name: user.user_metadata.full_name || user.user_metadata.name || user.email,
+        name: fullName,
         email: user.email,
         role: "customer",
+        gst_number: "MANDATORY_UPDATE",
+        pan_number: "MANDATORY_UPDATE",
         created_at: new Date()
       });
-      msg.innerHTML = '<div class="success">Sign up complete! Redirecting...</div>';
-      setTimeout(() => { window.location.href = "custdashboard.html"; }, 2200);
+      if (upsertError) throw upsertError;
+      msg.innerHTML = '<div class="success">Google signup complete! Redirecting to dashboard…</div>';
+      setTimeout(() => window.location.href = "custdashboard.html", 2200);
     } catch (err) {
-      msg.innerHTML = '<div class="error">Sign up error: ' + err.message + '</div>';
+      msg.innerHTML = '<div class="error">Database error: ' + err.message + '<br>Please contact support.</div>';
     }
   })();
 </script>

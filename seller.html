@@ -366,16 +366,16 @@
   </style>
 </head>
 <body>
-
 <nav>
   <h1>Seller Dashboard</h1>
   <div class="nav-group">
     <button id="profile-btn">Profile</button>
     <button id="orders-btn">Seller Orders</button>
     <button id="logout-btn">Logout</button>
-    </div>
+  </div>
 </nav>
-<div id="new-order-popup">
+
+<div id="new-order-popup" style="display:none;">
   <span id="new-order-text"></span>
   <button onclick="document.getElementById('new-order-popup').style.display='none'">Close</button>
 </div>
@@ -390,6 +390,7 @@
   <select id="subcategory" required disabled>
     <option value="" disabled selected>Select Subcategory</option>
   </select>
+
   <input type="text" id="hsn-code" placeholder="HSN Code" />
   <input type="text" id="prod-sku" placeholder="SKU" />
   <input type="number" step="0.001" min="0" id="prod-weight" placeholder="Weight (kg)" />
@@ -398,21 +399,32 @@
   <input type="number" min="0" step="0.01" id="dim-width" placeholder="Width" />
   <input type="number" min="0" step="0.01" id="dim-height" placeholder="Height" />
 
+  <label class="option-label" style="margin-top: 10px;">
+    <input type="checkbox" id="has-variants-checkbox" />
+    Has Colour/Size Variants
+  </label>
+
   <input type="number" step="0.01" min="0" id="prod-price" placeholder="Price (₹)" required />
   <input type="number" step="0.01" min="0" id="gst-rate" placeholder="GST Rate (%)" required />
   <input type="number" step="0.01" min="0" id="mrp-price" placeholder="MRP (₹)" required />
   <input type="number" min="0" id="prod-stock" placeholder="Stock (Qty)" required />
+
   <textarea id="prod-desc" placeholder="Description"></textarea>
-  <label for="prod-image-file" style="display:block; margin-top:10px; font-weight:bold;">Product Images (Max 5, compressed ~50KB)</label>
+
+  <label for="prod-image-file" style="display:block; margin-top:10px; font-weight:bold;">
+    Product Images (Max 5, compressed ~50KB)
+  </label>
   <input type="file" id="prod-image-file" accept="image/*" multiple />
   <div class="compression-info" id="compression-info"></div>
   <div id="image-preview-container" class="image-preview-container"></div>
+
   <div class="checkbox-row" style="margin:0.8rem 0;">
     <label class="option-label"><input type="checkbox" id="accept-cod" checked /> Accept COD</label>
     <label class="option-label"><input type="checkbox" id="accept-online" checked /> Accept Online Payment</label>
   </div>
+
   <label>Delivery Locations (Multiple Pincodes)</label>
-  <form id="delivery-location-form" style="display:flex; gap:8px; margin-bottom:10px;">
+  <div style="display:flex; gap:8px; margin-bottom:10px;">
     <input
             type="text"
             id="delivery-pincode-input"
@@ -423,8 +435,12 @@
             title="Enter a valid 6-digit pincode"
     />
     <button type="button" id="add-pincode-btn">Add</button>
-
+  </div>
   <ul id="delivery-pincode-list" style="list-style: disc inside; margin-top:0; padding-left:10px;"></ul>
+
+  <a id="manageVariantsLink" href="#" style="display:none; margin:10px 0 13px 0; font-weight:bold; background:#ffe785; border-radius:7px; padding:6px 11px;">
+    → Manage Variants
+  </a>
 
   <button type="submit">Add Product</button>
   <button type="button" id="cancel-edit-btn" class="cancel-edit-btn" style="display:none;">Cancel Edit</button>
@@ -435,8 +451,6 @@
 
 <h2>Return Requests</h2>
 <div id="returns-list"></div>
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1893226892962344"
-          crossorigin="anonymous"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -444,89 +458,73 @@
     'https://wamqheltqmufuzrqlxlb.supabase.co',
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
   );
-const length = parseFloat(document.getElementById('dim-length').value) || 0;
-const width = parseFloat(document.getElementById('dim-width').value) || 0;
-const height = parseFloat(document.getElementById('dim-height').value) || 0;
 
-const dimensions = {
-  length: length,
-  width: width,
-  height: height
-};
-
-  // --- POPUP: New Seller Orders ---
-  async function checkNewOrdersPopup() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data: orderItems, error } = await supabase
-      .from('order_items')
-      .select('order_id')
-      .eq('seller_id', user.id)
-      .in('delivery_status', ['placed', 'pending']);
-    if (error || !orderItems) return;
-    const uniqueOrders = Array.from(new Set(orderItems.map(i => i.order_id)));
-    if (uniqueOrders.length > 0) {
-      document.getElementById('new-order-text').textContent =
-        `You have ${uniqueOrders.length} new order${uniqueOrders.length > 1 ? "s" : ""} placed or pending.`;
-      document.getElementById('new-order-popup').style.display = 'block';
-    } else {
-      document.getElementById('new-order-popup').style.display = 'none';
-    }
-  }
-  // Run popup check on load and every 60s
-  setInterval(checkNewOrdersPopup, 2000);
   let sellerId = null, selectedFiles = [], existingImages = [];
   let allCategoriesList = [];
-let deliveryPincodes = new Set();
+  let deliveryPincodes = new Set();
 
-const deliveryPincodeInput = document.getElementById('delivery-pincode-input');
-const deliveryPincodeList = document.getElementById('delivery-pincode-list');
+  // Pincode management
+  const deliveryPincodeInput = document.getElementById('delivery-pincode-input');
+  const deliveryPincodeList = document.getElementById('delivery-pincode-list');
 
-function renderDeliveryPincodes() {
-  deliveryPincodeList.innerHTML = '';
-  if (deliveryPincodes.size === 0) {
-    deliveryPincodeList.innerHTML = '<li>No delivery pincodes added.</li>';
-    return;
+  function renderDeliveryPincodes() {
+    deliveryPincodeList.innerHTML = '';
+    if (deliveryPincodes.size === 0) {
+      deliveryPincodeList.innerHTML = '<li>No delivery pincodes added.</li>';
+      return;
+    }
+    deliveryPincodes.forEach(pin => {
+      const li = document.createElement('li');
+      li.textContent = pin;
+      const removeBtn = document.createElement('button');
+      removeBtn.textContent = 'Remove';
+      removeBtn.style.marginLeft = '10px';
+      removeBtn.onclick = () => {
+        deliveryPincodes.delete(pin);
+        renderDeliveryPincodes();
+      };
+      li.appendChild(removeBtn);
+      deliveryPincodeList.appendChild(li);
+    });
   }
-  deliveryPincodes.forEach(pin => {
-    const li = document.createElement('li');
-    li.textContent = pin;
 
-    const removeBtn = document.createElement('button');
-    removeBtn.textContent = 'Remove';
-    removeBtn.style.marginLeft = '10px';
-    removeBtn.onclick = () => {
-      deliveryPincodes.delete(pin);
-      renderDeliveryPincodes();
-    };
-
-    li.appendChild(removeBtn);
-    deliveryPincodeList.appendChild(li);
-  });
-}
-
-function isValidPincode(pin) {
-  return /^\d{6}$/.test(pin);
-}
-
-document.getElementById('add-pincode-btn').onclick = () => {
-  const val = deliveryPincodeInput.value.trim();
-  if (!isValidPincode(val)) {
-    alert('Please enter a valid 6-digit pincode');
-    return;
+  function isValidPincode(pin) {
+    return /^\d{6}$/.test(pin);
   }
-  if (deliveryPincodes.has(val)) {
-    alert('Pincode already added');
-    return;
-  }
-  deliveryPincodes.add(val);
-  deliveryPincodeInput.value = '';
+
+  document.getElementById('add-pincode-btn').onclick = () => {
+    const val = deliveryPincodeInput.value.trim();
+    if (!isValidPincode(val)) {
+      alert('Please enter a valid 6-digit pincode');
+      return;
+    }
+    if (deliveryPincodes.has(val)) {
+      alert('Pincode already added');
+      return;
+    }
+    deliveryPincodes.add(val);
+    deliveryPincodeInput.value = '';
+    renderDeliveryPincodes();
+  };
+
   renderDeliveryPincodes();
-};
 
-renderDeliveryPincodes();
+  // Variant toggle logic
+  document.getElementById('has-variants-checkbox').onchange = function() {
+    const v = this.checked;
+    document.getElementById('prod-price').disabled = v;
+    document.getElementById('prod-stock').disabled = v;
+    document.getElementById('mrp-price').disabled = v;
+    document.getElementById('manageVariantsLink').style.display = v ? 'inline-block' : 'none';
+  };
 
-  async function getUser() {
+  function showManageVariantsLink(prodId, showIt) {
+    const btn = document.getElementById('manageVariantsLink');
+    btn.href = `product_variants.html?product_id=${prodId}`;
+    btn.style.display = showIt ? 'inline-block' : 'none';
+  }
+
+   async function getUser() {
     const { data } = await supabase.auth.getUser();
     if (data && data.user) {
       sellerId = data.user.id;
@@ -541,6 +539,8 @@ renderDeliveryPincodes();
       window.location.href = 'login.html';
     }
   }
+
+
 
   async function checkSellerDetails() {
     const { data, error } = await supabase.from('profiles').select('gst_number, pan_number').eq('id', sellerId).single();
@@ -590,6 +590,7 @@ renderDeliveryPincodes();
       }
     };
   }
+
   async function compressImage(file, targetSizeKB = 50) {
     return new Promise((resolve) => {
       const reader = new FileReader();
@@ -718,86 +719,93 @@ renderDeliveryPincodes();
   }
 
   document.getElementById('product-form').onsubmit = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-const prodId = document.getElementById('prod-id').value;
+    const prodId = document.getElementById('prod-id').value;
+    const hasVariants = document.getElementById('has-variants-checkbox').checked;
 
-  const name = document.getElementById('prod-name').value.trim();
-  const categoryId = document.getElementById('category').value;
-  const subcategoryId = document.getElementById('subcategory').value || null;
-  const hsn_code = document.getElementById('hsn-code').value.trim() || null;
-  const price = parseFloat(document.getElementById('prod-price').value);
-  const stock = parseInt(document.getElementById('prod-stock').value, 10);
-  const description = document.getElementById('prod-desc').value.trim() || null;
-  const accept_cod = document.getElementById('accept-cod').checked;
-  const accept_online_payment = document.getElementById('accept-online').checked;
-  const gstRate = parseFloat(document.getElementById('gst-rate').value);
-  const mrpPrice = parseFloat(document.getElementById('mrp-price').value);
-  const sku = document.getElementById('prod-sku').value.trim() || null;
-  const weightRaw = document.getElementById('prod-weight').value;
-  const weight = weightRaw === '' ? null : parseFloat(weightRaw);
+    const name = document.getElementById('prod-name').value.trim();
+    const categoryId = document.getElementById('category').value;
+    const subcategoryId = document.getElementById('subcategory').value || null;
+    const hsn_code = document.getElementById('hsn-code').value.trim() || null;
+    const price = parseFloat(document.getElementById('prod-price').value);
+    const stock = parseInt(document.getElementById('prod-stock').value, 10);
+    const description = document.getElementById('prod-desc').value.trim() || null;
+    const accept_cod = document.getElementById('accept-cod').checked;
+    const accept_online_payment = document.getElementById('accept-online').checked;
+    const gstRate = parseFloat(document.getElementById('gst-rate').value);
+    const mrpPrice = parseFloat(document.getElementById('mrp-price').value);
+    const sku = document.getElementById('prod-sku').value.trim() || null;
+    const weightRaw = document.getElementById('prod-weight').value;
+    const weight = weightRaw === '' ? null : parseFloat(weightRaw);
 
-  const length = parseFloat(document.getElementById('dim-length').value) || 0;
-  const width = parseFloat(document.getElementById('dim-width').value) || 0;
-  const height = parseFloat(document.getElementById('dim-height').value) || 0;
-  const dimensions = { length, width, height };
+    const length = parseFloat(document.getElementById('dim-length').value) || 0;
+    const width = parseFloat(document.getElementById('dim-width').value) || 0;
+    const height = parseFloat(document.getElementById('dim-height').value) || 0;
+    const dimensions = { length, width, height };
 
-  // Basic validation
-  if (!name || !categoryId || isNaN(price) || isNaN(stock) || isNaN(gstRate) || isNaN(mrpPrice) || (weight !== null && isNaN(weight))) {
-    alert('Please fill required fields correctly.');
-    return;
-  }
+    // Basic validation
+    if (!name || !categoryId || isNaN(price) || isNaN(stock) || isNaN(gstRate) || isNaN(mrpPrice) || (weight !== null && isNaN(weight))) {
+      alert('Please fill required fields correctly.');
+      return;
+    }
 
-  let imageUrls = [...existingImages];
-  for (const fileObj of selectedFiles) {
-    const url = await uploadImage(fileObj.compressed);
-    if (url) imageUrls.push(url);
-  }
+    let imageUrls = [...existingImages];
+    for (const fileObj of selectedFiles) {
+      const url = await uploadImage(fileObj.compressed);
+      if (url) imageUrls.push(url);
+    }
 
-  const productData = {
-    seller_id: sellerId,
-    name,
-    category_id: subcategoryId || categoryId,
-    hsn_code,
-    price,
-    stock,
-    description,
-    accept_cod,
-    accept_online_payment,
-    sku,
-    weight,
-    dimensions,
-    gst_rate: gstRate,
-    mrp: mrpPrice,
-    image_url: imageUrls.length ? JSON.stringify(imageUrls) : null,
-    delivery_location: Array.from(deliveryPincodes)
+    const productData = {
+      seller_id: sellerId,
+      name,
+      category_id: subcategoryId || categoryId,
+      hsn_code,
+      price,
+      stock,
+      description,
+      accept_cod,
+      accept_online_payment,
+      sku,
+      weight,
+      dimensions,
+      gst_rate: gstRate,
+      mrp: mrpPrice,
+      image_url: imageUrls.length ? JSON.stringify(imageUrls) : null,
+      delivery_location: Array.from(deliveryPincodes),
+      has_variants: hasVariants
+    };
+
+    if (prodId) {
+      const { data, error } = await supabase.from('products')
+        .update(productData)
+        .eq('id', prodId);
+
+      if (error) {
+        console.error('Update error:', error);
+        alert('Failed to update product: ' + error.message);
+      } else {
+        alert('Product updated successfully!');
+        showManageVariantsLink(prodId, hasVariants);
+        resetForm();
+        loadSellerProducts();
+      }
+    } else {
+      const { data, error } = await supabase.from('products')
+        .insert([productData])
+        .select()
+        .single();
+      if (error) {
+        alert('Failed to add product: ' + error.message);
+      } else {
+        alert('Product added successfully!');
+        showManageVariantsLink(data.id, hasVariants);
+        resetForm();
+        loadSellerProducts();
+      }
+    }
   };
 
-  if (prodId) {
-  const { data, error } = await supabase.from('products')
-    .update(productData)
-    .eq('id', prodId);
-
-  if (error) {
-    console.error('Update error:', error);
-    alert('Failed to update product: ' + error.message);
-  } else {
-    alert('Product updated successfully!');
-    resetForm();
-    loadSellerProducts();
-  }
-} else {
-const { error } = await supabase.from('products')
-      .insert([productData]);
-    if (error) {
-      alert('Failed to add product: ' + error.message);
-    } else {
-      alert('Product added successfully!');
-      resetForm();
-      loadSellerProducts();
-    }
-  }
-};
   function resetForm() {
     document.getElementById('product-form').reset();
     document.getElementById('prod-id').value = '';
@@ -805,6 +813,10 @@ const { error } = await supabase.from('products')
     document.querySelector('#product-form button[type=submit]').textContent = 'Add Product';
     document.getElementById('accept-cod').checked = true;
     document.getElementById('accept-online').checked = true;
+    document.getElementById('prod-price').disabled = false;
+    document.getElementById('prod-stock').disabled = false;
+    document.getElementById('mrp-price').disabled = false;
+    document.getElementById('manageVariantsLink').style.display = 'none';
     selectedFiles = [];
     existingImages = [];
     renderImagePreviews();
@@ -821,14 +833,12 @@ const { error } = await supabase.from('products')
     data.forEach(prod => {
       const codTag = prod.accept_cod ? '<span class="option-tag cod-yes">COD</span>' : '<span class="option-tag cod-no">No COD</span>';
       const onlineTag = prod.accept_online_payment ? '<span class="option-tag online-yes">Online</span>' : '<span class="option-tag online-no">No Online</span>';
-
       let images = [];
       try {
         images = prod.image_url ? JSON.parse(prod.image_url) : [];
       } catch {
         images = prod.image_url ? [prod.image_url] : [];
       }
-
       let imagesHtml = '';
       if (images.length) {
         imagesHtml = '<div class="product-images-gallery">';
@@ -839,7 +849,6 @@ const { error } = await supabase.from('products')
       } else {
         imagesHtml = '<img src="https://via.placeholder.com/120" alt="No image"/>';
       }
-
       const div = document.createElement('div');
       div.className = 'product-card';
       div.innerHTML = `
@@ -847,16 +856,13 @@ const { error } = await supabase.from('products')
         <div class="product-name">${prod.name}</div>
         <div><b>Category ID:</b> ${prod.category_id || '-'}</div>
         <div><b>HSN Code:</b> ${prod.hsn_code || '-'}</div>
-
         <div class="product-price">₹${prod.price.toFixed(2)}</div>
-     <div><b>SKU:</b> ${prod.sku || '-'}</div>
-<div><b>Weight:</b> ${prod.weight ? prod.weight.toFixed(3) + ' kg' : '-'}</div>
-<div><b>Dimensions:</b> ${prod.dimensions ? JSON.stringify(prod.dimensions) : '-'}</div>
-
+        <div><b>SKU:</b> ${prod.sku || '-'}</div>
+        <div><b>Weight:</b> ${prod.weight ? prod.weight.toFixed(3) + ' kg' : '-'}</div>
+        <div><b>Dimensions:</b> ${prod.dimensions ? JSON.stringify(prod.dimensions) : '-'}</div>
         <div><b>GST Rate:</b> ${prod.gst_rate ? prod.gst_rate + '%' : '-'}</div>
         <div><b>MRP:</b> ₹${prod.mrp ? prod.mrp.toFixed(2) : '-'}</div>
-   <div class="product-desc">${prod.description || ''}</div>
-
+        <div class="product-desc">${prod.description || ''}</div>
         <div>
           <span class="stock-label ${prod.stock > 0 ? 'in-stock':'out-stock'}">
             ${prod.stock > 0 ? 'In Stock (' + prod.stock + ')':'Out of Stock'}
@@ -865,6 +871,9 @@ const { error } = await supabase.from('products')
         <div style="margin-top:6px;">${codTag} ${onlineTag}</div>
         <button class="edit-btn" onclick="editProduct('${prod.id}')">Edit</button>
         <button class="delete-btn" onclick="deleteProduct('${prod.id}')">Delete</button>
+        <a href="product_variants.html?product_id=${prod.id}" class="edit-btn" style="margin-top:7px; display:inline-block;">
+          Manage Variants
+        </a>
       `;
       container.appendChild(div);
     });
@@ -882,41 +891,40 @@ const { error } = await supabase.from('products')
     document.getElementById('hsn-code').value = prod.hsn_code || '';
     document.getElementById('prod-sku').value = prod.sku || '';
     document.getElementById('prod-weight').value = prod.weight || '';
-if (prod.dimensions) {
-  try {
-    const dims = prod.dimensions;
-    document.getElementById('dim-length').value = dims.length || '';
-    document.getElementById('dim-width').value = dims.width || '';
-    document.getElementById('dim-height').value = dims.height || '';
-  } catch (e) {
-    document.getElementById('dim-length').value = '';
-    document.getElementById('dim-width').value = '';
-    document.getElementById('dim-height').value = '';
-  }
-} else {
-  document.getElementById('dim-length').value = '';
-  document.getElementById('dim-width').value = '';
-  document.getElementById('dim-height').value = '';
-}
-
+    if (prod.dimensions) {
+      try {
+        const dims = prod.dimensions;
+        document.getElementById('dim-length').value = dims.length || '';
+        document.getElementById('dim-width').value = dims.width || '';
+        document.getElementById('dim-height').value = dims.height || '';
+      } catch (e) {
+        document.getElementById('dim-length').value = '';
+        document.getElementById('dim-width').value = '';
+        document.getElementById('dim-height').value = '';
+      }
+    } else {
+      document.getElementById('dim-length').value = '';
+      document.getElementById('dim-width').value = '';
+      document.getElementById('dim-height').value = '';
+    }
     document.getElementById('prod-price').value = prod.price;
     document.getElementById('gst-rate').value = prod.gst_rate ?? '';
     document.getElementById('mrp-price').value = prod.mrp ?? '';
-
     document.getElementById('prod-stock').value = prod.stock;
     document.getElementById('prod-desc').value = prod.description || '';
-    document.getElementById('cancel-edit-btn').style.display = 'inline-block';
-    document.querySelector('#product-form button[type=submit]').textContent = 'Update Product';
-    document.getElementById('accept-cod').checked = Boolean(prod.accept_cod);
-    document.getElementById('accept-online').checked = Boolean(prod.accept_online_payment);
-try {
-  const deliveryLocs = prod.delivery_location || [];
-  deliveryPincodes = new Set(deliveryLocs);
-} catch {
-  deliveryPincodes = new Set();
-}
-renderDeliveryPincodes();
+    document.getElementById('has-variants-checkbox').checked = !!prod.has_variants;
+    document.getElementById('prod-price').disabled = !!prod.has_variants;
+    document.getElementById('prod-stock').disabled = !!prod.has_variants;
+    document.getElementById('mrp-price').disabled = !!prod.has_variants;
+    showManageVariantsLink(prod.id, !!prod.has_variants);
 
+    try {
+      const deliveryLocs = prod.delivery_location || [];
+      deliveryPincodes = new Set(deliveryLocs);
+    } catch {
+      deliveryPincodes = new Set();
+    }
+    renderDeliveryPincodes();
 
     try {
       existingImages = prod.image_url ? JSON.parse(prod.image_url) : [];

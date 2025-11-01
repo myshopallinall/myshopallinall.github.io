@@ -169,8 +169,12 @@
 
   async function loadCart(){
     const { data, error } = await supabase.from('cart')
-      .select('id, product_id, quantity, products(name, price, seller_id, stock, accept_cod, gst_rate)')
-      .eq('customer_id', customerId);
+  .select(`
+    id, product_id, variant_id, quantity,
+    products(name, price, seller_id, stock, accept_cod, gst_rate),
+    product_variants(price, color, size, sku)
+  `)
+  .eq('customer_id', customerId);
 
     const container = document.getElementById('cart-list');
     if (error || !data || !data.length) {
@@ -182,24 +186,32 @@
       <th>Product</th><th>Price</th><th>Qty</th><th>Total</th><th>Remove</th><th>Pay</th>
     </tr></thead><tbody>`;
     data.forEach(item => {
-      html += `<tr>
-        <td>${item.products?.name ?? '-'}</td>
-        <td>₹${item.products?.price ?? '-'}</td>
-        <td>${item.quantity}</td>
-        <td>₹${((item.products?.price ?? 0) * item.quantity).toFixed(2)}</td>
-        <td><button class="remove-btn" onclick="removeFromCart('${item.id}')">Remove</button></td>
-        <td><button class="pay-btn" onclick="payForProduct(
-           '${item.id}',
-           ${item.products?.price},
-           ${item.quantity},
-           '${item.product_id}',
-           '${item.products?.seller_id}',
-           ${item.products?.gst_rate ?? 0},
-           ${item.products?.accept_cod ? 'true' : 'false'}
-        )">Buy</button></td>
-      </tr>`;
-    });
-    html += '</tbody></table>';
+  // Preferred price: variant > product
+  const price = item.product_variants?.price ?? item.products?.price ?? 0;
+  const priceFormat = price ? `₹${price}` : '-';
+  const total = (price * (item.quantity ?? 1)).toFixed(2);
+
+  html += `<tr>
+    <td>
+      ${item.products?.name ?? '-'}
+      ${item.product_variants ? `<br><small>${item.product_variants.color || ''} ${item.product_variants.size || ''}</small>` : ''}
+    </td>
+    <td>${priceFormat}</td>
+    <td>${item.quantity}</td>
+    <td>₹${total}</td>
+    <td><button class="remove-btn" onclick="removeFromCart('${item.id}')">Remove</button></td>
+    <td><button class="pay-btn" onclick="payForProduct(
+      '${item.id}',
+      ${price},
+      ${item.quantity},
+      '${item.product_id}',
+      '${item.products?.seller_id}',
+      ${item.products?.gst_rate ?? 0},
+      ${item.products?.accept_cod ? 'true' : 'false'}
+    )">Buy</button></td>
+  </tr>`;
+});
+html += '</tbody></table>';
     container.innerHTML = html;
   }
 

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Manage Product Variants</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body { font-family: 'Montserrat', Arial, sans-serif; background: #f3f4f8; padding: 12px; }
+    h2 { color: #232f3e; margin-bottom: 18px;}
+    #variants-table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 4px 20px #232f3e09;}
+    #variants-table th, #variants-table td { border: 1px solid #dde5ee; padding: 10px;}
+    #variants-table th { background: #232f3e; color: #ffd814;}
+    .form-row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .form-row > * { flex: 1; padding: 7px; min-width: 110px; }
+    .remove-btn { background: #e74c3c; color: #fff; border: none; border-radius: 7px; padding: 3px 14px; cursor:pointer; }
+    img.thumbnail { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
+  </style>
+</head>
+<body>
+<h2>Product Variants</h2>
+<div class="form-row">
+  <select id="variant-color" required>
+    <option value="" disabled selected>Colour</option>
+    <option value="Mango">Mango</option>
+    <option value="Black">Black</option>
+    <option value="White">White</option>
+    <option value="Cream">Cream</option>
+    <option value="Green">Green</option>
+    <option value="Orange">Orange</option>
+    <option value="Red">Red</option>
+    <option value="Blue">Blue</option>
+    <option value="Yellow">Yellow</option>
+    <option value="Purple">Purple</option>
+    <option value="Pink">Pink</option>
+    <option value="Brown">Brown</option>
+    <option value="Grey">Grey</option>
+    <option value="Maroon">Maroon</option>
+    <option value="Navy Blue">Navy Blue</option>
+    <option value="Sky Blue">Sky Blue</option>
+    <option value="Violet">Violet</option>
+    <option value="Olive">Olive</option>
+    <option value="Gold">Gold</option>
+    <option value="Silver">Silver</option>
+    <option value="Peach">Peach</option>
+    <option value="Magenta">Magenta</option>
+    <option value="Lavender">Lavender</option>
+    <option value="Turquoise">Turquoise</option>
+    <option value="Cyan">Cyan</option>
+  </select>
+  <input type="text" id="variant-size" placeholder="Size (eg. XL, 42inch)" required />
+  <input type="number" id="variant-price" placeholder="Price" min="0" step="0.01" required />
+  <input type="number" id="variant-mrp" placeholder="MRP" min="0" step="0.01" required />
+  <input type="number" id="variant-stock" placeholder="Stock" min="0" required />
+  <input type="text" id="variant-sku" placeholder="SKU" />
+  <input type="file" id="variant-images" accept="image/*" multiple />
+  <button type="button" id="add-variant-btn">Add Variant</button>
+</div>
+
+<table id="variants-table" style="width:100%;">
+  <thead>
+  <tr>
+    <th>Colour</th>
+    <th>Size</th>
+    <th>Price</th>
+    <th>MRP</th>
+    <th>Stock</th>
+    <th>SKU</th>
+    <th>Image</th>
+    <th>Remove</th>
+  </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<button id="save-all-btn" style="margin-top:21px; padding:9px 28px; font-weight:bold; background:#ffd814; border:none; color:#232f3e; border-radius:6px;">Save All</button>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const productId = urlParams.get('product_id');
+  if (!productId) {
+    alert('Product ID missing!');
+    history.back();
+  }
+
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  let variants = [];
+  let variantImagesFiles = [];
+
+  document.getElementById('variant-images').addEventListener('change', e => {
+    variantImagesFiles = Array.from(e.target.files);
+  });
+
+  function renderVariants() {
+  const tbody = document.getElementById('variants-table').querySelector('tbody');
+  tbody.innerHTML = '';
+  variants.forEach((v, i) => {
+    let images = [];
+    try { images = v.image_urls ? JSON.parse(v.image_urls) : []; } catch {}
+    const imgHtml = images.length > 0 ? `<img src="${images[0]}" alt="Variant Image" class="thumbnail">` : '-';
+    const isSaved = Boolean(v.id);
+
+    tbody.innerHTML += `<tr>
+      <td>${v.color}</td>
+      <td>${v.size}</td>
+      <td>₹${Number(v.price).toFixed(2)}</td>
+      <td>₹${Number(v.mrp).toFixed(2)}</td>
+      <td>${v.stock}</td>
+      <td>${v.sku || '-'}</td>
+      <td>${imgHtml}</td>
+      <td>
+        <button class="remove-btn" onclick="removeVariant(${i}, ${isSaved ? v.id : 'null'})">Delete</button>
+      </td>
+    </tr>`;
+  });
+}
+
+window.removeVariant = async function(index, variantId) {
+  // Remove locally first
+  variants.splice(index, 1);
+  renderVariants();
+  // If saved in DB, delete from DB immediately
+  if (variantId) {
+    const { error } = await supabase.from('product_variants').delete().eq('id', variantId);
+    if (error) alert('Failed to delete variant from DB: ' + error.message);
+    else alert('Variant deleted from database!');
+  }
+};
+
+async function uploadVariantImages(files) {
+    const urls = [];
+    for (const file of files) {
+      const fileName = `variant-images/${productId}/${Date.now()}_${Math.random().toString(36).substring(2,10)}_${file.name}`;
+      const { error } = await supabase.storage.from('variant-images').upload(fileName, file, { upsert: true });
+      if (error) {
+        alert('Image upload failed: ' + error.message);
+        return null;
+      }
+      const { data } = supabase.storage.from('variant-images').getPublicUrl(fileName);
+      if (data && data.publicUrl) urls.push(data.publicUrl);
+    }
+    return urls;
+  }
+
+  document.getElementById('add-variant-btn').onclick = async function() {
+    const color = document.getElementById('variant-color').value;
+    const size = document.getElementById('variant-size').value.trim();
+    const price = parseFloat(document.getElementById('variant-price').value);
+    const mrp = parseFloat(document.getElementById('variant-mrp').value);
+    const stock = parseInt(document.getElementById('variant-stock').value, 10);
+    const sku = document.getElementById('variant-sku').value.trim();
+
+    if (!color || !size || isNaN(price) || isNaN(mrp) || isNaN(stock)) {
+      alert('Fill all required fields!');
+      return;
+    }
+
+    let imageUrls = [];
+    if (variantImagesFiles.length > 0) {
+      const urls = await uploadVariantImages(variantImagesFiles);
+      if (urls) {
+        imageUrls = urls;
+      } else {
+        alert('Failed to upload images for variant.');
+        return;
+      }
+    }
+
+    variants.push({ color, size, price, mrp, stock, sku, image_urls: JSON.stringify(imageUrls) });
+    renderVariants();
+
+    // Clear inputs
+    document.getElementById('variant-color').value = '';
+    document.getElementById('variant-size').value = '';
+    document.getElementById('variant-price').value = '';
+    document.getElementById('variant-mrp').value = '';
+    document.getElementById('variant-stock').value = '';
+    document.getElementById('variant-sku').value = '';
+    document.getElementById('variant-images').value = '';
+    variantImagesFiles = [];
+  };
+
+  document.getElementById('save-all-btn').onclick = async function() {
+    if (variants.length === 0) {
+      alert('No variants to save!');
+      return;
+    }
+    // Delete existing variants then insert anew
+    const { error: deleteError } = await supabase.from('product_variants').delete().eq('product_id', productId);
+    if (deleteError) {
+      alert('Failed to clear old variants: ' + deleteError.message);
+      return;
+    }
+
+    const { error } = await supabase.from('product_variants').insert(
+      variants.map(v => ({ ...v, product_id: parseInt(productId) }))
+    );
+    if (error) alert('Error saving variants: ' + error.message);
+    else alert('Variants saved successfully!');
+  };
+
+  // Load existing variants on page load
+  async function loadExistingVariants() {
+    const { data, error } = await supabase.from('product_variants').select('*').eq('product_id', productId);
+    if (!error && data) {
+      variants = data;
+      renderVariants();
+    }
+  }
+  loadExistingVariants();
+</script>
+</body>
+</html>

@@ -27,6 +27,15 @@
       cursor: zoom-in;
       background: #fff;
     }
+    .variant-swatch img {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+  margin-bottom: 3px;
+  border: 1px solid #eee;
+}
+
     .thumbs { margin-top: 1rem; display: flex; justify-content: center; gap: 10px; }
     .thumbs img { width: 70px; height: 70px; border-radius: 6px; border: 2px solid transparent; cursor: pointer; object-fit: cover; }
     .thumbs img.active, .thumbs img:hover { border-color: #0070f3; transform: scale(1.05);}
@@ -232,6 +241,7 @@
         </svg>
         Share
       </button>
+      <div class="variant-swatches" id="variantSwatchList"></div>
 
 
     </div>
@@ -301,6 +311,76 @@
   let profileName = null;
 let zoomImages = [];
 let zoomIndex = 0;
+let variants = [];
+let selectedVariant = null;
+
+// Load and display product variants
+async function loadVariants(productId) {
+  const { data, error } = await supabase
+    .from('product_variants')
+    .select('*')
+    .eq('product_id', productId);
+  if (!error && Array.isArray(data)) {
+    variants = data;
+    renderVariantSwatches();
+    if (variants.length) selectVariant(0);
+  }
+}
+
+// Render variant swatches/colors/sizes
+function renderVariantSwatches() {
+  const variantSwatchList = document.getElementById('variantSwatchList');
+  if (!variantSwatchList) return;
+  variantSwatchList.innerHTML = '';
+  variants.forEach((v, idx) => {
+    let images = [];
+    try { images = v.image_urls ? JSON.parse(v.image_urls) : []; } catch {}
+    let variantImg = images[0] || 'https://via.placeholder.com/46x46?text=NA';
+    let selClass = (selectedVariant && selectedVariant.id === v.id) ? 'selected' : '';
+    let label = v.color + (v.size ? " / " + v.size : "");
+    const swatch = document.createElement('div');
+    swatch.className = 'variant-swatch ' + selClass;
+    swatch.innerHTML = `<img src="${variantImg}" alt="${label}" />
+      <div class="variant-swatch-label">${label}</div>
+      <div style="font-size:0.94em; color:#787;"><span>₹${v.price}</span></div>`;
+    swatch.onclick = () => selectVariant(idx);
+    variantSwatchList.appendChild(swatch);
+  });
+}
+
+// When a variant is selected
+function selectVariant(idx) {
+  selectedVariant = variants[idx];
+  renderVariantSwatches();
+  document.getElementById('prodPrice').textContent = "₹" + selectedVariant.price;
+  document.getElementById('prodStock').textContent = selectedVariant.stock > 0
+    ? `In Stock (${selectedVariant.stock})` : 'Out of Stock';
+  document.getElementById('prodStock').classList.toggle('out-stock', selectedVariant.stock <= 0);
+  document.getElementById('prodDesc').innerText =
+    productData.description || (selectedVariant.color + " " + selectedVariant.size);
+
+  // Update main/spec images
+  let images = [];
+  try { images = selectedVariant.image_urls ? JSON.parse(selectedVariant.image_urls) : []; } catch {}
+  if (!images.length) images = ['https://via.placeholder.com/400?text=No+Image'];
+  const main = document.getElementById('mainImage');
+  const thumbs = document.getElementById('thumbs');
+  main.src = images[0];
+  thumbs.innerHTML = '';
+  images.forEach((img, i) => {
+    let thumb = document.createElement('img');
+    thumb.src = img;
+    if (i === 0) thumb.classList.add('active');
+    thumb.onclick = () => {
+      main.src = img;
+      thumbs.querySelectorAll('img').forEach(x => x.classList.remove('active'));
+      thumb.classList.add('active');
+      main.onclick = () => openModal(i, images);
+    };
+    thumbs.appendChild(thumb);
+  });
+  zoomImages = images;
+}
 
   async function loadProduct() {
     const { data, error } = await supabase
@@ -314,6 +394,7 @@ let zoomIndex = 0;
     }
     productData = data;
     displayProduct(data);
+    await loadVariants(data.id);
     await loadReviews();
     loadComparison(data.category_id, data.id);
    }
@@ -406,20 +487,31 @@ document.addEventListener('keydown', function(e){
   }
 });
 
-  document.getElementById('addToCartBtn').onclick = async () => {
-    if (!productData || productData.stock <= 0) return alert("Product out of stock!");
-    const qty = parseInt(document.getElementById('quantityInput').value) || 1;
-    const { data: user } = await supabase.auth.getUser();
-    if (!user.user)
-
-    {  alert("Please login first to add products to cart.");
+document.getElementById('addToCartBtn').onclick = async () => {
+  if (variants.length && (!selectedVariant || selectedVariant.stock <= 0))
+    return alert("Select a variant or variant out of stock!");
+  const qty = parseInt(document.getElementById('quantityInput').value) || 1;
+  const { data: user } = await supabase.auth.getUser();
+  if (!user.user) {
+    alert("Please login first to add products to cart.");
     window.location.href = "login.html";
     return;
-    }
-    customerId = user.user.id;
-    await supabase.from('cart').insert([{ customer_id: customerId, product_id: productId, quantity: qty }]);
-    alert('Product added to cart!');
-  };
+  }
+  customerId = user.user.id;
+
+  const { error } = await supabase.from('cart').insert([{
+    customer_id: customerId,
+    product_id: productId,
+    variant_id: selectedVariant ? selectedVariant.id : null,
+    quantity: qty
+    // No price field!
+  }]);
+  if (error) {
+    alert("Cart add failed: " + error.message);
+    return;
+  }
+  alert('Product added to cart!');
+};
 
   // .............. Review Section ............
   let selectedRating = 0;

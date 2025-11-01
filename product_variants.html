@@ -12,7 +12,8 @@
     #variants-table th { background: #232f3e; color: #ffd814;}
     .form-row { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
     .form-row > * { flex: 1; padding: 7px; min-width: 110px; }
-    .remove-btn { background: #e74c3c; color: #fff; border: none; border-radius: 7px; padding: 3px 14px; cursor:pointer; }
+    .remove-btn, .edit-btn { background: #e74c3c; color: #fff; border: none; border-radius: 7px; padding: 3px 14px; cursor:pointer; margin-right:5px; }
+    .edit-btn { background: #3498db; }
     img.thumbnail { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
   </style>
 </head>
@@ -46,6 +47,8 @@
     <option value="Lavender">Lavender</option>
     <option value="Turquoise">Turquoise</option>
     <option value="Cyan">Cyan</option>
+    <option value="No colour">No Colour</option>
+    <option value="Same colour">Same Colour</option>
   </select>
   <input type="text" id="variant-size" placeholder="Size (eg. XL, 42inch)" required />
   <input type="number" id="variant-price" placeholder="Price" min="0" step="0.01" required />
@@ -54,6 +57,7 @@
   <input type="text" id="variant-sku" placeholder="SKU" />
   <input type="file" id="variant-images" accept="image/*" multiple />
   <button type="button" id="add-variant-btn">Add Variant</button>
+  <button type="button" id="cancel-edit-btn" style="display:none; margin-left:12px;">Cancel Edit</button>
 </div>
 
 <table id="variants-table" style="width:100%;">
@@ -90,48 +94,48 @@
 
   let variants = [];
   let variantImagesFiles = [];
+  let currentEditIndex = -1;
 
   document.getElementById('variant-images').addEventListener('change', e => {
     variantImagesFiles = Array.from(e.target.files);
   });
 
   function renderVariants() {
-  const tbody = document.getElementById('variants-table').querySelector('tbody');
-  tbody.innerHTML = '';
-  variants.forEach((v, i) => {
-    let images = [];
-    try { images = v.image_urls ? JSON.parse(v.image_urls) : []; } catch {}
-    const imgHtml = images.length > 0 ? `<img src="${images[0]}" alt="Variant Image" class="thumbnail">` : '-';
-    const isSaved = Boolean(v.id);
+    const tbody = document.getElementById('variants-table').querySelector('tbody');
+    tbody.innerHTML = '';
+    variants.forEach((v, i) => {
+      let images = [];
+      try { images = v.image_urls ? JSON.parse(v.image_urls) : []; } catch {}
+      const imgHtml = images.length > 0 ? `<img src="${images[0]}" alt="Variant Image" class="thumbnail">` : '-';
+      const isSaved = Boolean(v.id);
 
-    tbody.innerHTML += `<tr>
-      <td>${v.color}</td>
-      <td>${v.size}</td>
-      <td>₹${Number(v.price).toFixed(2)}</td>
-      <td>₹${Number(v.mrp).toFixed(2)}</td>
-      <td>${v.stock}</td>
-      <td>${v.sku || '-'}</td>
-      <td>${imgHtml}</td>
-      <td>
-        <button class="remove-btn" onclick="removeVariant(${i}, ${isSaved ? v.id : 'null'})">Delete</button>
-      </td>
-    </tr>`;
-  });
-}
-
-window.removeVariant = async function(index, variantId) {
-  // Remove locally first
-  variants.splice(index, 1);
-  renderVariants();
-  // If saved in DB, delete from DB immediately
-  if (variantId) {
-    const { error } = await supabase.from('product_variants').delete().eq('id', variantId);
-    if (error) alert('Failed to delete variant from DB: ' + error.message);
-    else alert('Variant deleted from database!');
+      tbody.innerHTML += `<tr>
+        <td>${v.color}</td>
+        <td>${v.size}</td>
+        <td>₹${Number(v.price).toFixed(2)}</td>
+        <td>₹${Number(v.mrp).toFixed(2)}</td>
+        <td>${v.stock}</td>
+        <td>${v.sku || '-'}</td>
+        <td>${imgHtml}</td>
+        <td>
+          <button class="edit-btn" onclick="editVariant(${i})">Edit</button>
+          <button class="remove-btn" onclick="removeVariant(${i}, ${isSaved ? v.id : 'null'})">Delete</button>
+        </td>
+      </tr>`;
+    });
   }
-};
 
-async function uploadVariantImages(files) {
+  window.removeVariant = async function(index, variantId) {
+    variants.splice(index, 1);
+    renderVariants();
+    if (variantId) {
+      const { error } = await supabase.from('product_variants').delete().eq('id', variantId);
+      if (error) alert('Failed to delete variant from DB: ' + error.message);
+      else alert('Variant deleted from database!');
+    }
+  };
+
+  async function uploadVariantImages(files) {
     const urls = [];
     for (const file of files) {
       const fileName = `variant-images/${productId}/${Date.now()}_${Math.random().toString(36).substring(2,10)}_${file.name}`;
@@ -144,6 +148,38 @@ async function uploadVariantImages(files) {
       if (data && data.publicUrl) urls.push(data.publicUrl);
     }
     return urls;
+  }
+
+  function editVariant(index) {
+    currentEditIndex = index;
+    const v = variants[index];
+    document.getElementById('variant-color').value = v.color;
+    document.getElementById('variant-size').value = v.size;
+    document.getElementById('variant-price').value = v.price;
+    document.getElementById('variant-mrp').value = v.mrp;
+    document.getElementById('variant-stock').value = v.stock;
+    document.getElementById('variant-sku').value = v.sku;
+    variantImagesFiles = [];
+    document.getElementById('add-variant-btn').textContent = 'Update Variant';
+    document.getElementById('cancel-edit-btn').style.display = 'inline-block';
+  }
+
+  document.getElementById('cancel-edit-btn').onclick = function() {
+    resetForm();
+  };
+
+  function resetForm() {
+    currentEditIndex = -1;
+    document.getElementById('variant-color').value = '';
+    document.getElementById('variant-size').value = '';
+    document.getElementById('variant-price').value = '';
+    document.getElementById('variant-mrp').value = '';
+    document.getElementById('variant-stock').value = '';
+    document.getElementById('variant-sku').value = '';
+    document.getElementById('variant-images').value = '';
+    variantImagesFiles = [];
+    document.getElementById('add-variant-btn').textContent = 'Add Variant';
+    document.getElementById('cancel-edit-btn').style.display = 'none';
   }
 
   document.getElementById('add-variant-btn').onclick = async function() {
@@ -170,18 +206,24 @@ async function uploadVariantImages(files) {
       }
     }
 
-    variants.push({ color, size, price, mrp, stock, sku, image_urls: JSON.stringify(imageUrls) });
-    renderVariants();
+    if (currentEditIndex === -1) {
+      variants.push({ color, size, price, mrp, stock, sku, image_urls: JSON.stringify(imageUrls) });
+    } else {
+      const v = variants[currentEditIndex];
+      v.color = color;
+      v.size = size;
+      v.price = price;
+      v.mrp = mrp;
+      v.stock = stock;
+      v.sku = sku;
+      if (imageUrls.length > 0) v.image_urls = JSON.stringify(imageUrls);
+      currentEditIndex = -1;
+      document.getElementById('add-variant-btn').textContent = 'Add Variant';
+      document.getElementById('cancel-edit-btn').style.display = 'none';
+    }
 
-    // Clear inputs
-    document.getElementById('variant-color').value = '';
-    document.getElementById('variant-size').value = '';
-    document.getElementById('variant-price').value = '';
-    document.getElementById('variant-mrp').value = '';
-    document.getElementById('variant-stock').value = '';
-    document.getElementById('variant-sku').value = '';
-    document.getElementById('variant-images').value = '';
-    variantImagesFiles = [];
+    renderVariants();
+    resetForm();
   };
 
   document.getElementById('save-all-btn').onclick = async function() {
@@ -189,7 +231,6 @@ async function uploadVariantImages(files) {
       alert('No variants to save!');
       return;
     }
-    // Delete existing variants then insert anew
     const { error: deleteError } = await supabase.from('product_variants').delete().eq('product_id', productId);
     if (deleteError) {
       alert('Failed to clear old variants: ' + deleteError.message);
@@ -203,7 +244,6 @@ async function uploadVariantImages(files) {
     else alert('Variants saved successfully!');
   };
 
-  // Load existing variants on page load
   async function loadExistingVariants() {
     const { data, error } = await supabase.from('product_variants').select('*').eq('product_id', productId);
     if (!error && data) {

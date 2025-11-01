@@ -267,6 +267,7 @@ html += '</tbody></table>';
         .single();
 
       if (orderError) throw new Error(orderError.message);
+      const { data: cartRow, error: cartError } = await supabase.from('cart').select('*').eq('id', cartId).single();
 
       const { error: orderItemError } = await supabase.from('order_items').insert([{
         order_id: order.id,
@@ -275,6 +276,7 @@ html += '</tbody></table>';
         quantity: quantity,
         price: price,
         gst_rate: gstRate,
+        variant_id: cartRow.variant_id,
         status: paymentType === 'cod' ? 'pending' : 'confirmed'
       }]);
 

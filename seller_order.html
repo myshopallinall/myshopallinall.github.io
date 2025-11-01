@@ -173,6 +173,7 @@
           courier_name,
           courier_tracking_number,
           courier_tracking_url,
+          product_variants(color, size),
           products(name, seller_id),
           profiles_seller: seller_id(id, name, address1, email, gst_number, pan_number, phone)
         )
@@ -422,13 +423,13 @@ function formatAddress(profile) {
   }
 
  async function showInvoice(orderId, sellerId) {
-  const { data: order, error } = await supabase.from('orders')
-    .select(`
-      id,
-      total,
-      status,
-      created_at,
-      profiles:customer_id(name, address1,  address2, landmark, town_city, village, district, state, pincode, email, phone),
+const { data: order, error } = await supabase.from('orders')
+  .select(`
+    id,
+    total,
+    status,
+    created_at,
+    profiles:customer_id(name, address1, address2, landmark, town_city, village, district, state, pincode, email, phone),
     order_items(
       id,
       product_id,
@@ -442,12 +443,13 @@ function formatAddress(profile) {
       courier_name,
       courier_tracking_number,
       courier_tracking_url,
+      product_variants(color, size),
       products(name, seller_id),
       profiles_seller: seller_id(id, name, address1, address2, landmark, town_city, village, district, state, pincode, email, gst_number, pan_number, phone)
     )
   `)
-    .eq('id', orderId)
-    .single();
+  .eq('id', orderId)
+  .single();
 
   if (error) {
     showStatusMessage('Failed to load invoice: ' + error.message, '#ffeded', '#a10021');
@@ -586,8 +588,11 @@ function formatAddress(profile) {
     }
 
     html += `<tr>
-      <td>${item.products.name}</td>
-      <td>${item.hsn_code || '-'}</td>
+     <td>
+      ${item.products.name}
+       <br><small>Color: ${item.product_variants?.color || '-'} Size: ${item.product_variants?.size || '-'}</small>
+      </td>
+     <td>${item.hsn_code || '-'}</td>
       <td>${qty}</td>
       <td>₹${priceIncGST.toFixed(2)}</td>
       <td>₹${lineTotalIncGST.toFixed(2)}</td>

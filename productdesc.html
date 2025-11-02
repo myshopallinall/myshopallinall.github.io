@@ -27,6 +27,47 @@
       cursor: zoom-in;
       background: #fff;
     }
+    .variant-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 1.1em 0 0;
+}
+.variant-swatch {
+  flex: 0 1 120px;
+  background: #f5f8fc;
+  border: 2px solid #eee;
+  border-radius: 8px;
+  padding: 9px 8px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: border .17s, box-shadow .19s;
+  box-shadow: 0 2px 8px #232f3e09;
+  position: relative;
+}
+.variant-swatch.selected {
+  border: 2.2px solid #0070f3;
+  box-shadow: 0 4px 12px #0070f30a;
+}
+.variant-swatch-label {
+  font-weight: 600;
+  font-size: 1.08em;
+  color: #444;
+  margin-bottom: 0.3em;
+}
+.variant-swatch .out-stock-label {
+  position: absolute;
+  bottom: 7px;
+  left: 0;
+  right: 0;
+  background: #fff4f4;
+  color: #d20000;
+  font-size: 0.93em;
+  border-radius: 3px;
+  padding: 1px 0;
+  font-weight: 700;
+}
+
     .variant-swatch img {
   width: 36px;
   height: 36px;
@@ -338,12 +379,22 @@ function renderVariantSwatches() {
     let variantImg = images[0] || 'https://via.placeholder.com/46x46?text=NA';
     let selClass = (selectedVariant && selectedVariant.id === v.id) ? 'selected' : '';
     let label = v.color + (v.size ? " / " + v.size : "");
+    // Show stock status within each block
+    let outStockHtml = v.stock > 0 ? '' : `<div class="out-stock-label">Out of Stock</div>`;
     const swatch = document.createElement('div');
     swatch.className = 'variant-swatch ' + selClass;
-    swatch.innerHTML = `<img src="${variantImg}" alt="${label}" />
+    swatch.innerHTML = `
+      <img src="${variantImg}" alt="${label}" />
       <div class="variant-swatch-label">${label}</div>
-      <div style="font-size:0.94em; color:#787;"><span>₹${v.price}</span></div>`;
-    swatch.onclick = () => selectVariant(idx);
+      <div style="font-size:0.98em;color:#505;"><span>₹${v.price}</span></div>
+      ${outStockHtml}
+    `;
+    swatch.onclick = () => {
+      // Only select if in stock
+      if (v.stock > 0) selectVariant(idx);
+    };
+    // Dimmed visual for out of stock
+    if (v.stock <= 0) swatch.style.opacity = '0.55';
     variantSwatchList.appendChild(swatch);
   });
 }

@@ -222,6 +222,7 @@
         delivery_status,
         status,
         products:product_id(name, image_url),
+         variants:variant_id(color, size),
         orders:order_id(created_at)
       `)
       .in('order_id', orderIds)
@@ -241,11 +242,19 @@
 
     items.forEach(item => {
       // Build the product image URL (prepend base URL if necessary)
-      const imgSrc = item.products?.image_url
-        ? (item.products.image_url.startsWith("http")
-            ? item.products.image_url
-            : baseStorageUrl + item.products.image_url)
-        : "https://via.placeholder.com/128";
+     let imgVal = item.products?.image_url;
+if (imgVal) {
+  // Handle JSON arrays (e.g. ["image1.jpg","image2.jpg"])
+  if (typeof imgVal === "string" && imgVal.startsWith("[")) {
+    try {
+      const arr = JSON.parse(imgVal);
+      if (Array.isArray(arr) && arr.length) imgVal = arr[0];
+    } catch {}
+  }
+}
+const imgSrc = imgVal
+  ? (imgVal.startsWith("http") ? imgVal : baseStorageUrl + imgVal)
+  : "https://via.placeholder.com/128";
 
       const altText = item.products?.name || "Product";
 
@@ -259,18 +268,22 @@
 
       const card = document.createElement("div");
       card.className = "order-card";
+const variantInfo = item.variants
+  ? `Color: ${item.variants.color || "-"}, Size: ${item.variants.size || "-"}`
+  : "";
+card.innerHTML = `
+  <div class="order-info">
+    <img src="${imgSrc}" class="product-img" alt="${altText}" />
+    <div class="details">
+      <div class="product-title">${altText}</div>
+      <div class="tiny">${variantInfo}</div>  <!-- Variant displayed here -->
+      <div class="tiny">Order #${item.order_id}</div>
+      <div class="tiny">Ordered on ${item.orders?.created_at ? new Date(item.orders.created_at).toLocaleDateString() : '-'}</div>
+      <div class="quantity">Qty: ${item.quantity}</div>
+      <div style="margin-top:7px;">${statusBadge(item.delivery_status)}${item.returned ? '<span class="badger returned">Returned</span>' : ""}${item.status === "cancelled" ? '<span class="badger cancelled">Cancelled</span>': ""}</div>
+    </div>
+  </div>
 
-      card.innerHTML = `
-        <div class="order-info">
-          <img src="${imgSrc}" class="product-img" alt="${altText}" />
-          <div class="details">
-            <div class="product-title">${altText}</div>
-            <div class="tiny">Order #${item.order_id}</div>
-            <div class="tiny">Ordered on ${item.orders?.created_at ? new Date(item.orders.created_at).toLocaleDateString() : '-'}</div>
-            <div class="quantity">Qty: ${item.quantity}</div>
-            <div style="margin-top:7px;">${statusBadge(item.delivery_status)}${item.returned ? '<span class="badger returned">Returned</span>' : ""}${item.status === "cancelled" ? '<span class="badger cancelled">Cancelled</span>': ""}</div>
-          </div>
-        </div>
         <div class="order-actions action-box">
           ${canCancel ? `<button class="action-btn cancel-btn">Cancel</button>` : ""}
           ${canReturn ? `
@@ -331,8 +344,8 @@
           // Mark as returned
          const { error: upError } = await supabase
              .from('order_items')
-             .update({ returned: true, status: 'returned' })
-             .eq('id', item.id);
+           .update({ returned: true, status: 'returned', delivery_status: 'returned' })
+          .eq('id', item.id);
        if (upError) {
             msg.style.color = "red";
             msg.textContent = "Failed to update: " + upError.message;

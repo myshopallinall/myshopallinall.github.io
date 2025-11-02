@@ -32,6 +32,8 @@
     .status-dispatched { background: #2bc26b;}
     .status-delivered { background: #219f43;}
     .status-pending { background: #e67e22;}
+    .status-returned { background: #d0021b; color: #fff; }
+    .prod-status-returned { background: #d0021b; color: #fff; }
     .status-cancelled { background: #d82c27 !important; color: #fff !important; }
     .paid-badge { background: #007d37;}
     .cod-badge { background: #ffe600; color: #444;}
@@ -199,13 +201,15 @@
       ).map(item => item.hsn_code || '-').join(', ');
 
       // Determine overall delivery/payment status for the order
-      let overallStatus = order.order_items
-        .filter(item => item.profiles_seller && item.profiles_seller.id === user.id)
-        .map(item => item.delivery_status || item.status).reduce((a,b) =>{
-          // If any product not delivered, show appropriate earliest status
-          if (a === "delivered" && b !== "delivered") return b;
-          return a;
-        },"delivered");
+      const sellerItems = order.order_items.filter(item => item.profiles_seller && item.profiles_seller.id === user.id);
+let overallStatus = "delivered";
+
+if (sellerItems.some(item => item.delivery_status === "returned" || item.return_status === "returned" || item.is_returned)) {
+  overallStatus = "returned";
+} else {
+  overallStatus = sellerItems.map(item => item.delivery_status || item.status)
+                            .reduce((a, b) => (a === "delivered" && b !== "delivered") ? b : a, "delivered");
+}
 
       let paymentStatus = order.order_items.some(i => i.cod_payment_status === "paid")
         ? `<span class="paid-badge payment-status-indicator">Paid via COD</span>`
@@ -218,7 +222,10 @@
         <td>${order.id}</td>
         <td>${order.profiles.name}</td>
         <td>
-          <span class="delivery-status-badge status-${overallStatus}">${overallStatus.charAt(0).toUpperCase() + overallStatus.slice(1)}</span>
+         <span class="delivery-status-badge status-${overallStatus}">
+  ${overallStatus.charAt(0).toUpperCase() + overallStatus.slice(1)}
+</span>
+
           ${paymentStatus}
         </td>
         <td>${new Date(order.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
@@ -272,9 +279,11 @@
     `;
     filteredItems.forEach(item => {
       let prodStatusClass = "prod-status-ind";
-      let statusText = (item.delivery_status || item.status || "pending");
-      if (DELIVERY_STATUSES.includes(statusText)) prodStatusClass += ` prod-status-${statusText}`;
-      else prodStatusClass += ` prod-status-pending`;
+
+let statusText = (item.delivery_status || item.status || "pending");
+if (item.delivery_status === "returned" || item.return_status === "returned" || item.is_returned) {
+  statusText = "returned";
+}
 
  // Next delivery step
 let availableBtns = '';

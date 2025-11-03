@@ -508,25 +508,47 @@
 
     // Custom order for home: offer > rating > best seller > featured > latest
     filtered.sort((a, b) => {
-      // Offer
+  switch(sortBy) {
+    case 'name_asc':
+      return (a.name || '').localeCompare(b.name || '');
+    case 'name_desc':
+      return (b.name || '').localeCompare(a.name || '');
+    case 'price_asc':
+      return (a.price || 0) - (b.price || 0);
+    case 'price_desc':
+      return (b.price || 0) - (a.price || 0);
+    case 'category_asc': {
+      const catA = allCategories.find(c => c.id === a.category_id)?.name || '';
+      const catB = allCategories.find(c => c.id === b.category_id)?.name || '';
+      return catA.localeCompare(catB);
+    }
+    case 'category_desc': {
+      const catA = allCategories.find(c => c.id === a.category_id)?.name || '';
+      const catB = allCategories.find(c => c.id === b.category_id)?.name || '';
+      return catB.localeCompare(catA);
+    }
+    case 'latest':
+    default:
+      // Your custom order for home page fallback (offer, rating, best seller, featured, latest)
       let pctA = a.mrp && a.price && a.mrp > a.price ? (a.mrp - a.price) / a.mrp : 0;
       let pctB = b.mrp && b.price && b.mrp > b.price ? (b.mrp - b.price) / b.mrp : 0;
       if (pctA !== pctB) return pctB - pctA;
-      // Rating
+
       let ratingA = parseFloat(a.rating) || 0;
       let ratingB = parseFloat(b.rating) || 0;
       if (ratingA !== ratingB) return ratingB - ratingA;
-      // Best Seller
+
       let soldA = salesCountMap[a.id] || 0;
       let soldB = salesCountMap[b.id] || 0;
       if (soldA !== soldB) return soldB - soldA;
-      // Featured
+
       let featuredA = a.featured ? 1 : 0;
       let featuredB = b.featured ? 1 : 0;
       if (featuredA !== featuredB) return featuredB - featuredA;
-      // Fallback by latest (created_at desc is already default)
-      return 0;
-    });
+
+      return 0; // fallback stable order
+  }
+});
 
     const container = document.getElementById('products-list');
     container.innerHTML = '';

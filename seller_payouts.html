@@ -121,7 +121,7 @@
     periodEnd.setHours(23, 59, 59, 999);
 
     try {
-      const { data: payouts, error } = await supabase.rpc('get_pending_seller_payouts', {
+      const { data: payouts, error } = await supabase.rpc('get_payment_seller_payouts', {
         period_start: periodStart.toISOString(),
         period_end: periodEnd.toISOString()
       });

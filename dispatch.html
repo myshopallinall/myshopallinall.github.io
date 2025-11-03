@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="google-adsense-account" content="ca-pub-1893226892962344">
+
+  <title>Seller Order Management</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 2rem; background: #f4f8fc; }
+    h1 { color: #0070f3; margin-bottom: 1.5rem;}
+    table { width: 100%; border-collapse: collapse; box-shadow: 0 1px 6px #ccc; background: white;}
+    th, td { padding: 10px; border: 1px solid #ddd; text-align: left;}
+    th { background: #eef5ff;}
+    button { padding: 6px 13px; margin: 2px 2px 2px 0; border: none; border-radius: 5px; color: white; cursor: pointer;}
+    .btn-delivery-info { background: #4568ea;}
+    .btn-invoice { background: #f9a825;}
+    .delivery-status-badge { padding: 2px 11px; border-radius: 11px; color: #fff; font-weight: bold; font-size: 0.99em; }
+    .status-delivered { background: #219f43;}
+    .status-cancelled { background: #d82c27 !important; color: #fff !important; }
+    .status-returned {
+  background: #bb2222;
+  color: #fff;
+}
+
+    .pending-badge { background: #e67e22;}
+    .paid-badge { background: #007d37;}
+    .cancelled-row td { background: #ffe9ea; }
+  </style>
+</head>
+<body>
+<h1>Seller Order Management</h1>
+<table id="orders-table">
+  <thead>
+  <tr>
+    <th>Order ID</th>
+    <th>Customer</th>
+    <th>Status</th>
+    <th>Created At</th>
+    <th>HSN Code(s)</th>
+    <th>Actions</th>
+  </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1893226892962344"
+        crossorigin="anonymous"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  async function loadSellerOrders() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('Please login first!');
+      window.location.href = 'login.html';
+      return;
+    }
+   const { data: orders, error } = await supabase.from('orders')
+  .select(`
+    id,
+    customer_id,
+    created_at,
+    profiles:customer_id(name),
+    order_items(
+      id,
+      hsn_code,
+      status,
+      delivery_status,
+      profiles_seller:seller_id(id)
+    )
+  `)
+  .order('created_at', { ascending: false });
+
+    if (error) return;
+
+    // Only show seller's own items
+    const sellerOrders = orders.filter(order =>
+      order.order_items.some(item =>
+        item.profiles_seller && item.profiles_seller.id === user.id
+      )
+    );
+    const tbody = document.querySelector('#orders-table tbody');
+    tbody.innerHTML = '';
+
+    sellerOrders.forEach(order => {
+      const itemsForSeller = order.order_items.filter(
+        item => item.profiles_seller && item.profiles_seller.id === user.id
+      );
+      // If ALL items for seller are cancelled, hide the delivery button
+      const allCancelled = itemsForSeller.length > 0 &&
+        itemsForSeller.every(item =>
+          (item.delivery_status === "cancelled" || item.status === "cancelled")
+        );
+// Check if all items are returned
+const allReturned = itemsForSeller.length > 0 &&
+  itemsForSeller.every(item =>
+    (item.delivery_status === "returned" || item.status === "returned")
+  );
+      const itemCodes = itemsForSeller.map(item => item.hsn_code || '-').join(', ');
+      // For status, show as cancelled if all are cancelled, else show delivered or pending
+      let mainStatus = "pending";
+      if (allCancelled) mainStatus = "cancelled";
+    else if (allReturned) mainStatus = "returned";
+      else if (itemsForSeller.every(i => i.delivery_status === "delivered")) mainStatus = "delivered";
+      // Badge
+      let statusHtml = `<span class="delivery-status-badge status-${mainStatus}">${mainStatus.charAt(0).toUpperCase()+mainStatus.slice(1)}</span>`;
+
+      let tr = document.createElement('tr');
+      if (allCancelled) tr.classList.add("cancelled-row");
+      tr.innerHTML = `
+        <td>${order.id}</td>
+        <td>${order.profiles.name}</td>
+        <td>${statusHtml}</td>
+        <td>${new Date(order.created_at).toLocaleString()}</td>
+        <td>${itemCodes}</td>
+        <td></td>
+      `;
+
+      tbody.appendChild(tr);
+      const actionTd = tr.querySelector('td:last-child');
+
+      // Only show Delivery Details if NOT all cancelled
+      if (!allCancelled && !allReturned) {
+        const deliveryBtn = document.createElement('button');
+        deliveryBtn.className = 'btn-delivery-info';
+        deliveryBtn.textContent = 'Delivery Details';
+        deliveryBtn.onclick = () => alert('Show Delivery Details Modal');
+        actionTd.appendChild(deliveryBtn);
+      }
+
+      // You may add always-visible Invoice button or similar actions here.
+      const invoiceBtn = document.createElement('button');
+      invoiceBtn.className = 'btn-invoice';
+      invoiceBtn.textContent = 'Invoice';
+      invoiceBtn.onclick = () => alert('Show Invoice Modal');
+      actionTd.appendChild(invoiceBtn);
+    });
+  }
+
+  window.onload = loadSellerOrders;
+</script>
+</body>
+</html>

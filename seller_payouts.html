@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Seller Payments - MyShop Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    body { background: #f6f7fa; font-family: 'Montserrat', Arial, Helvetica, sans-serif; margin: 0; padding-bottom: 40px;}
+    .container { max-width: 1200px; margin: 24px auto; background: #fff; border-radius: 10px; box-shadow: 0 5px 30px #dadada; padding: 28px 36px 32px; }
+    h1 { font-weight: 700; letter-spacing:1px; color:#232f3e; margin-bottom: 16px;text-align:center;}
+    .date-filters { display: flex; gap: 12px; margin-bottom: 24px; justify-content: center; flex-wrap: wrap;}
+    .date-filters label { font-weight: 600; color: #232f3e; font-size: 1rem; align-self: center;}
+    .date-filters input[type="date"] { padding: 8px 12px; border-radius: 6px; border: 1.5px solid #ddd; font-size: 1rem; }
+    .date-filters button { padding: 9px 24px; border-radius: 22px; background: #0070f3; color: white; font-weight: 600; cursor: pointer; border: none; font-size: 1.1rem; transition: background 0.18s; }
+    .date-filters button:hover { background: #005bb5; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 16px;}
+    th, td { padding: 13px 10px; border-bottom: 1px solid #e4e7ea; text-align: center; font-size:1rem;}
+    th { background: #f4f8fc; color: #313648; font-weight:700;}
+    tr:last-child td { border-bottom: none; }
+    .pay-status-paid { color: #078736; font-weight:600; }
+    .pay-status-unpaid { color: #ff9800; font-weight:600;}
+    .pay-btn { padding:8px 24px; background:#078736; color:#fff; border:none; border-radius:7px; font-weight:600; letter-spacing:0.5px; font-size:1rem; cursor:pointer;}
+    .pay-btn:disabled { background: #d5d5d5; color: #aaa; cursor: not-allowed;}
+    .pay-btn.processing { background:#f3b73a;color:#fff; }
+    .invoice-btn {padding:8px 15px;background:#0070f3;color:#fff;border:none;border-radius:5px;font-size:1rem;font-weight:600;cursor:pointer;margin-top:4px;}
+    .invoice-btn:hover {background:#004fcc;}
+    .spinner { display:inline-block; width: 21px; height: 21px; border: 3px solid #0070f3; border-radius: 50%; border-top: 3px solid #fff; animation: spin 1s linear infinite; vertical-align:middle;}
+    @keyframes spin { 0%{ transform:rotate(0);} 100%{transform:rotate(360deg);} }
+    .msg { text-align: center; margin: 18px 0 0 0; font-size:1.16rem; min-height: 1.5rem; color: #e53935; }
+    #payment-modal { display: none; position: fixed; top: 20%; left: 50%; transform: translateX(-50%); background: white; padding: 20px 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.2); border-radius: 10px; width: 340px; z-index: 1000;}
+    #payment-modal label { display: block; margin-bottom: 8px; font-weight: 600;}
+    #payment-modal input { width: 100%; padding: 7px 10px; margin-bottom: 14px; border: 1.5px solid #ddd; border-radius: 6px; font-size: 1rem;}
+    #payment-modal button { background: #078736; color: white; font-weight: 600; border: none; cursor: pointer; padding: 9px 24px; border-radius: 7px; font-size: 1rem; letter-spacing: 0.5px; margin-right: 8px;}
+    #payment-modal button.cancel-btn { background: #e53935; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>Seller Payments</h1>
+  <div class="date-filters">
+    <label for="from-date">From:</label>
+    <input type="date" id="from-date" />
+    <label for="to-date">To:</label>
+    <input type="date" id="to-date" />
+    <button onclick="loadPayments()">Load Report</button>
+  </div>
+  <div id="payments-msg" class="msg"></div>
+  <table>
+    <thead>
+    <tr>
+      <th>Seller</th>
+      <th>Bank</th>
+      <th>IFSC</th>
+      <th>Account</th>
+      <th>Total Sales (₹)</th>
+      <th>Commission (2%)</th>
+      <th>Net Payable (₹)</th>
+      <th>Status</th>
+      <th>Pay</th>
+      <th>Invoice</th>
+    </tr>
+    </thead>
+    <tbody id="seller-payments"></tbody>
+  </table>
+</div>
+
+<!-- Payment Modal -->
+<div id="payment-modal">
+  <label for="transactionid-input">Transaction ID:</label>
+  <input type="text" id="transactionid-input" placeholder="Enter Transaction ID" />
+  <label for="utr-input">UTR Number:</label>
+  <input type="text" id="utr-input" placeholder="Enter UTR number" />
+  <label for="paydate-input">Payment Date:</label>
+  <input type="date" id="paydate-input" />
+  <div style="text-align: right;">
+    <button id="confirm-pay-btn">Confirm Payment</button>
+    <button class="cancel-btn" id="cancel-pay-btn">Cancel</button>
+  </div>
+</div>
+
+<div id="invoice-modal" style="display:none; position:fixed; top:8%; left:50%; transform:translateX(-50%); background:#fff; box-shadow:0 10px 30px #bbb; padding:32px 20px 14px 32px; border-radius:12px; max-width:450px; min-width:320px;">
+  <div style="text-align:right;">
+    <button onclick="closeInvoice()" style="font-size:1.7rem; background:none; border:none; color:#e53935; cursor:pointer;">×</button>
+  </div>
+  <div id="invoice-content" style="padding:0 12px 10px 8px;"></div>
+  <div style="text-align:center;">
+    <button onclick="printInvoice()" class="invoice-btn" style="margin-bottom:12px;">Print/Save PDF</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  let currentPayment = null;
+
+  function formatCurrency(num) {
+    return '₹' + num.toFixed(2);
+  }
+
+  async function loadPayments() {
+    const fromDateInput = document.getElementById('from-date').value;
+    const toDateInput = document.getElementById('to-date').value;
+    const msgElem = document.getElementById('payments-msg');
+    const tbody = document.getElementById('seller-payments');
+    tbody.innerHTML = `<tr><td colspan="10"><span class="spinner"></span> Loading...</td></tr>`;
+    msgElem.textContent = '';
+
+    if (!fromDateInput || !toDateInput) {
+      msgElem.textContent = 'Please select both From and To dates.';
+      tbody.innerHTML = '';
+      return;
+    }
+
+    const periodStart = new Date(fromDateInput);
+    const periodEnd = new Date(toDateInput);
+    periodEnd.setHours(23, 59, 59, 999);
+
+    try {
+      const { data: payouts, error } = await supabase.rpc('get_payment_seller_payouts', {
+        period_start: periodStart.toISOString(),
+        period_end: periodEnd.toISOString()
+      });
+
+      if (error) throw error;
+
+      tbody.innerHTML = '';
+
+      if (!payouts || payouts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="10">No payouts found for the selected date range.</td></tr>`;
+        return;
+      }
+
+      payouts.forEach(p => {
+        const commission = p.total_sales * 0.02;
+        const netPay = p.total_sales - commission;
+        const sellerLabel = `<strong>${p.seller_name}</strong><br/><small>${p.seller_id}</small>`;
+
+        // Ensure id is included in the object passed! (critical)
+        const payButton = p.payment_date ?
+          `<span class="pay-status-paid">Paid<br/>Transaction ID: ${p.transaction_id || '-'}<br/>UTR: ${p.utr || '-'}<br/>Date: ${p.payment_date ? new Date(p.payment_date).toLocaleDateString('en-IN') : '-'}</span>` :
+          `<button class="pay-btn" onclick='showPayModal(${JSON.stringify({ id: p.id, seller_id: p.seller_id, net_pay: netPay })}, this)'>Pay</button>`;
+
+        tbody.innerHTML += `
+          <tr>
+            <td>${sellerLabel}</td>
+            <td>${p.bank_name || '-'}</td>
+            <td>${p.ifsc_code || '-'}</td>
+            <td>${p.bank_account || '-'}</td>
+            <td>${formatCurrency(p.total_sales)}</td>
+            <td>${formatCurrency(commission)}</td>
+            <td>${formatCurrency(netPay)}</td>
+            <td>${p.payment_date ? '<span class="pay-status-paid">Paid</span>' : '<span class="pay-status-unpaid">Unpaid</span>'}</td>
+            <td>${payButton}</td>
+            <td>
+              <button class="invoice-btn" onclick="generateInvoice('${p.seller_id}', '${p.seller_name}', '${p.bank_name}', '${p.bank_account}', '${p.ifsc_code}', ${p.total_sales}, ${commission}, ${netPay}, 'N/A', 'N/A')">Invoice</button>
+            </td>
+          </tr>`;
+      });
+    } catch (err) {
+      msgElem.textContent = err.message;
+      tbody.innerHTML = '';
+    }
+  }
+
+  function showPayModal(sellerData, btn) {
+    currentPayment = { ...sellerData, buttonElement: btn };
+    document.getElementById('transactionid-input').value = '';
+    document.getElementById('utr-input').value = '';
+    document.getElementById('paydate-input').value = '';
+    document.getElementById('payment-modal').style.display = 'block';
+  }
+
+  function closePayModal() {
+    document.getElementById('payment-modal').style.display = 'none';
+    currentPayment = null;
+  }
+
+  document.getElementById('cancel-pay-btn').onclick = closePayModal;
+
+  document.getElementById('confirm-pay-btn').onclick = async function () {
+    const transactionId = document.getElementById('transactionid-input').value.trim();
+    const utr = document.getElementById('utr-input').value.trim();
+    const payDate = document.getElementById('paydate-input').value;
+
+    if (!transactionId) return alert('Please enter the Transaction ID.');
+    if (!utr) return alert('Please enter the UTR number.');
+    if (!payDate) return alert('Please select the payment date.');
+    if (!currentPayment || !currentPayment.id) return alert('Invalid payment operation.');
+
+    this.disabled = true;
+    this.textContent = 'Processing...';
+
+    try {
+      const { error } = await supabase.from('seller_payouts').update({
+        payment_date: new Date(payDate).toISOString(),
+        transaction_id: transactionId,
+        utr: utr,
+        status: 'paid',
+      }).eq('id', currentPayment.id);
+
+      if (error) throw error;
+
+      if (currentPayment.buttonElement) {
+        currentPayment.buttonElement.disabled = true;
+        currentPayment.buttonElement.innerHTML = 'Paid!';
+        currentPayment.buttonElement.classList.remove('pay-btn');
+        currentPayment.buttonElement.classList.add('pay-status-paid');
+      }
+
+      alert('Payment marked as paid successfully.');
+      loadPayments();
+
+    } catch (err) {
+      alert('Failed to update payment: ' + err.message);
+    }
+
+    this.disabled = false;
+    this.textContent = 'Confirm Payment';
+    closePayModal();
+  };
+
+  // Invoice modal functions unchanged
+  window.generateInvoice = function (seller_id, seller_name, bank_name, account, ifsc, total, commission, payout) {
+    const now = new Date();
+    const d = now.toLocaleString('en-IN');
+    document.getElementById('invoice-content').innerHTML = `
+      <h2 style="color:#0070f3;">Commission Invoice</h2>
+      <div style="margin-bottom:14px;"><strong>Date:</strong> ${d}</div>
+      <div><b>Seller:</b> ${seller_name}</div>
+      <div><b>Seller ID:</b> ${seller_id}</div>
+      <div><b>Bank:</b> ${bank_name}</div>
+      <div><b>Account No:</b> ${account}</div>
+      <div><b>IFSC:</b> ${ifsc}</div>
+      <hr/>
+      <div><b>Total Sales:</b> ${formatCurrency(total)}</div>
+      <div><b>Commission (2%):</b> ${formatCurrency(commission)}</div>
+      <div><b>Net Payable to Seller:</b> ${formatCurrency(payout)}</div>
+      <hr/>
+      <div><b>Note:</b> The above commission amount is charged by MyShop as per policy for facilitation of sales through our e-commerce platform.</div>
+      <div style="margin-top:10px;font-size:1.09rem;color:#444;">This is a system generated statement.</div>
+    `;
+    document.getElementById('invoice-modal').style.display = 'block';
+  };
+
+  window.closeInvoice = function () {
+    document.getElementById('invoice-modal').style.display = 'none';
+  };
+
+  window.printInvoice = function () {
+    const printWin = window.open('', '', 'height=570,width=520');
+    printWin.document.write('<html><head><title>Invoice - MyShop</title></head><body>');
+    printWin.document.write(document.getElementById('invoice-content').innerHTML);
+    printWin.document.write('</body></html>');
+    printWin.document.close();
+    printWin.print();
+  };
+</script>
+</body>
+</html>

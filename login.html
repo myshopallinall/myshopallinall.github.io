@@ -80,12 +80,13 @@
     window.location.href = profile.role === 'seller' ? 'seller.html' : 'custdashboard.html';
   });
 document.getElementById('google-login').onclick = async function() {
+    const redirectUrl = window.location.origin + '/login.html'; // Change if needed
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      // options: { redirectTo: 'https://yourdomain.com/login.html' } // Optional
+        provider: 'google',
+        options: { redirectTo: redirectUrl }
     });
     if (error) alert('Google login error: ' + error.message);
-  };
+};
 
   document.getElementById('login-form').onsubmit = async function(e) {
     e.preventDefault();

@@ -80,8 +80,8 @@
     window.location.href = profile.role === 'seller' ? 'seller.html' : 'custdashboard.html';
   });
 document.getElementById('google-login').onclick = async function() {
- //   const redirectUrl = window.location.origin + '/login.html'; // Change if needed
-    const { error } = await supabase.auth.signInWithOAuth({
+  const redirectUrl = window.location.origin + '/google_signup_finish.html'; // Change if needed
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo: redirectUrl }
     });

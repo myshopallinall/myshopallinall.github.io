@@ -822,6 +822,15 @@ async function placeOrderAndClearCart(cartId, price, quantity, productId, seller
     if (newStock >= 0) {
       await supabase.from('products').update({ stock: newStock }).eq('id', productId);
     }
+// Update variant stock too if variantIdToBuy exists
+if(variantIdToBuy) {
+  const variantStockRes = await supabase.from('product_variants').select('stock').eq('id', variantIdToBuy).single();
+  let variantCurrentStock = variantStockRes.data?.stock ?? 0;
+  const variantNewStock = variantCurrentStock - quantity;
+  if(variantNewStock >= 0) {
+    await supabase.from('product_variants').update({ stock: variantNewStock }).eq('id', variantIdToBuy);
+  }
+}
 
     // Remove cart item
     await supabase.from('cart').delete().eq('id', cartId);

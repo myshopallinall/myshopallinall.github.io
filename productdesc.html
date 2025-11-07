@@ -810,6 +810,7 @@ async function placeOrderAndClearCart(cartId, price, quantity, productId, seller
         quantity: quantity,
         price: price,
         gst_rate: gstRate,
+        variant_id: variantIdToBuy,
         status: paymentMethod === 'cod' ? 'pending' : 'confirmed'
       }]);
     if (orderItemError) throw orderItemError;

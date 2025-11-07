@@ -675,25 +675,27 @@ document.getElementById('addToCartBtn').onclick = async () => {
     });
   }
 // [CORRECTED] 'buyNowBtn' Event Listener
-
 document.getElementById('buyNowBtn').addEventListener('click', async () => {
-  // 1. ADD THIS CHECK: Make sure a variant is selected
+  // Check variant selection
   if (variants.length && (!selectedVariant || selectedVariant.stock <= 0)) {
     alert("Please select an available variant to buy.");
     return;
   }
 
-  // This is the specific variant ID to be saved
+  // Capture variant ID and price
   const variantIdToBuy = selectedVariant ? selectedVariant.id : null;
-  // THIS IS THE CORRECT PRICE TO USE
   const variantPrice = selectedVariant ? selectedVariant.price : productData.price;
+  
+  console.log('Buy Now clicked with variantId:', variantIdToBuy);
 
+  // Check product stock
   if (!productData || (selectedVariant && selectedVariant.stock <= 0) || (!selectedVariant && productData.stock <= 0)) {
     alert("Product out of stock!");
     return;
   }
   const qty = parseInt(document.getElementById('quantityInput').value) || 1;
 
+  // Confirm user login
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) {
     alert("Please login first.");
@@ -701,15 +703,15 @@ document.getElementById('buyNowBtn').addEventListener('click', async () => {
     return;
   }
   customerId = user.user.id;
-
+  
   try {
-    // 2. FIX THE QUERY: Check for the variant_id as well
+    // Check for existing cart entry including variant ID
     const { data: existingEntry } = await supabase
       .from('cart')
       .select('id, quantity')
       .eq('customer_id', customerId)
       .eq('product_id', productId)
-      .eq('variant_id', variantIdToBuy) // <-- This line is crucial
+      .eq('variant_id', variantIdToBuy)
       .maybeSingle();
 
     let cartId;
@@ -722,14 +724,14 @@ document.getElementById('buyNowBtn').addEventListener('click', async () => {
       if (updateError) throw updateError;
       cartId = existingEntry.id;
     } else {
-      // 3. FIX THE INSERT: Add the variant_id
+      // Insert new cart with variant ID
       const { data: insertedData, error: insertError } = await supabase
         .from('cart')
         .insert([{
             customer_id: customerId,
             product_id: productId,
             quantity: qty,
-            variant_id: variantIdToBuy // <-- This line is crucial
+            variant_id: variantIdToBuy
         }])
         .select()
         .single();
@@ -737,22 +739,27 @@ document.getElementById('buyNowBtn').addEventListener('click', async () => {
       cartId = insertedData.id;
     }
 
-    // 4. FIX THE FUNCTION CALL: Pass the correct variant price and ID
-    processPaymentForCartItem(
+    console.log('Cart updated/created with id:', cartId, 'and variantId:', variantIdToBuy);
+
+    // Proceed to payment and order placement
+    await processPaymentForCartItem(
         cartId,
-        variantPrice, // <-- Use variantPrice
+        variantPrice,
         qty,
         productId,
         productData.seller_id,
         productData.gst_rate,
         productData.accept_cod,
-        variantIdToBuy  // <-- Pass the variantId
+        variantIdToBuy
     );
 
   } catch (error) {
+    console.error("Failed processing Buy Now:", error);
     alert("Failed to add to cart or initiate payment: " + (error.message || error));
   }
 });
+
+      
 // Payment flow reused from your cart page logic with COD check & Razorpay integration
 async function processPaymentForCartItem(cartId, price, quantity, productId, sellerId, gstRate, acceptCod, variantIdToBuy) {
   const totalAmount = price * quantity;

@@ -754,7 +754,7 @@ document.getElementById('buyNowBtn').addEventListener('click', async () => {
   }
 });
 // Payment flow reused from your cart page logic with COD check & Razorpay integration
-async function processPaymentForCartItem(cartId, price, quantity, productId, sellerId, gstRate, acceptCod) {
+async function processPaymentForCartItem(cartId, price, quantity, productId, sellerId, gstRate, acceptCod, variantIdToBuy) {
   const totalAmount = price * quantity;
 
   if (totalAmount <= 0) {
@@ -778,7 +778,7 @@ async function processPaymentForCartItem(cartId, price, quantity, productId, sel
       name: 'MyShop',
       description: `Payment for ${quantity} x ${productId}`,
       handler: async function (response) {
-        await placeOrderAndClearCart(cartId, price, quantity, productId, sellerId, gstRate, totalAmount, response.razorpay_payment_id, 'online');
+        await placeOrderAndClearCart(cartId, price, quantity, productId, sellerId, gstRate, totalAmount, response.razorpay_payment_id, 'online',variantIdToBuy);
       },
       theme: { color: '#0070f3' }
     };
@@ -791,7 +791,7 @@ async function processPaymentForCartItem(cartId, price, quantity, productId, sel
 }
 
 // Use your existing placeOrder logic for order creation, stock update, and cart cleanup.
-async function placeOrderAndClearCart(cartId, price, quantity, productId, sellerId, gstRate, totalAmount, paymentId, paymentMethod) {
+async function placeOrderAndClearCart(cartId, price, quantity, productId, sellerId, gstRate, totalAmount, paymentId, paymentMethod,variantIdToBuy) {
   try {
     const orderStatus = paymentMethod === 'cod' ? 'pending' : 'paid';
 

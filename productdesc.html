@@ -346,14 +346,7 @@
     'https://wamqheltqmufuzrqlxlb.supabase.co',
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
   );
-  const localTimeString = new Date(order.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
-orders.forEach(order => {
-  // old: let dateStr = new Date(order.created_at).toLocaleString();
-  // new:
-  const localTimeString = new Date(order.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
-  // Use localTimeString to display in your order entry/card
-});
-
+  
   const productId = new URLSearchParams(window.location.search).get('id');
   let productData = null;
   let customerId = null;

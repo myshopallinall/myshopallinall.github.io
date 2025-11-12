@@ -797,11 +797,11 @@ async function processPaymentForCartItem(cartId, price, quantity, productId, sel
   }
 }
 
-// Use your existing placeOrder logic for order creation, stock update, and cart cleanup.
-async function placeOrderAndClearCart(cartId, price, quantity, productId, sellerId, gstRate, totalAmount, paymentId, paymentMethod,variantIdToBuy) {
+async function placeOrderAndClearCart(cartId, price, quantity, productId, sellerId, gstRate, totalAmount, paymentId, paymentMethod) {
   try {
     const orderStatus = paymentMethod === 'cod' ? 'pending' : 'paid';
 
+    // Insert the order
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert([{ customer_id: customerId, total: totalAmount, payment_id: paymentId, status: orderStatus }])
@@ -809,37 +809,39 @@ async function placeOrderAndClearCart(cartId, price, quantity, productId, seller
       .single();
     if (orderError) throw orderError;
 
-    const { error: orderItemError } = await supabase.from('order_items')
-      .insert([{
-        order_id: order.id,
-        product_id: productId,
-        seller_id: sellerId,
-        quantity: quantity,
-        price: price,
-        gst_rate: gstRate,
-        variant_id: variantIdToBuy,
-        status: paymentMethod === 'cod' ? 'pending' : 'confirmed'
-      }]);
+    // Always fetch the cart row for correct variant_id
+    const { data: cartRow, error: cartError } = await supabase.from('cart').select('*').eq('id', cartId).single();
+    if (cartError || !cartRow) throw cartError || new Error('Cart row not found');
+
+    // Insert order_items using cartRow.variant_id (works even for Buy Now)
+    const { error: orderItemError } = await supabase.from('order_items').insert([{
+      order_id: order.id,
+      product_id: productId,
+      seller_id: sellerId,
+      quantity: quantity,
+      price: price,
+      gst_rate: gstRate,
+      variant_id: cartRow.variant_id,
+      status: paymentMethod === 'cod' ? 'pending' : 'confirmed'
+    }]);
     if (orderItemError) throw orderItemError;
 
-    // Update stock
+    // Update product and variant stock as before
     const stockRes = await supabase.from('products').select('stock').eq('id', productId).single();
     let currentStock = stockRes.data?.stock ?? 0;
     const newStock = currentStock - quantity;
     if (newStock >= 0) {
       await supabase.from('products').update({ stock: newStock }).eq('id', productId);
     }
-// Update variant stock too if variantIdToBuy exists
-if(variantIdToBuy) {
-  const variantStockRes = await supabase.from('product_variants').select('stock').eq('id', variantIdToBuy).single();
-  let variantCurrentStock = variantStockRes.data?.stock ?? 0;
-  const variantNewStock = variantCurrentStock - quantity;
-  if(variantNewStock >= 0) {
-    await supabase.from('product_variants').update({ stock: variantNewStock }).eq('id', variantIdToBuy);
-  }
-}
+    if (cartRow.variant_id) {
+      const variantStockRes = await supabase.from('product_variants').select('stock').eq('id', cartRow.variant_id).single();
+      let variantCurrentStock = variantStockRes.data?.stock ?? 0;
+      const variantNewStock = variantCurrentStock - quantity;
+      if (variantNewStock >= 0) {
+        await supabase.from('product_variants').update({ stock: variantNewStock }).eq('id', cartRow.variant_id);
+      }
+    }
 
-    // Remove cart item
     await supabase.from('cart').delete().eq('id', cartId);
 
     alert(`Order placed successfully (${paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online Payment'})`);
@@ -847,7 +849,6 @@ if(variantIdToBuy) {
     alert('Order processing error: ' + (error.message || error));
   }
 }
-
   document.getElementById('shareBtn').addEventListener('click', () => {
     const url = window.location.href;
     navigator.clipboard.writeText(url).then(() => {

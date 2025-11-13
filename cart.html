@@ -243,9 +243,13 @@ html += '</tbody></table>';
         currency: 'INR',
         name: 'MyShop',
         description: `Payment for ${quantity} pcs`,
-        handler: async function (response) {
+        handler: async function (response) { try {
           await placeOrderAndClearCart(cartId, price, quantity, productId, sellerId, gstRate, totalAmount, response.razorpay_payment_id, 'online');
-        },
+        } catch(err)
+        { console.error ('Order placement after payment failed:', err);
+                    alter ('Order placement failed after payment: ' + err.message);
+                    }
+                                           },
         theme: {
           color: '#0070f3'
         }

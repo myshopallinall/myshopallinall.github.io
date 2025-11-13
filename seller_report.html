@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Seller Sales Report - MyShop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #f4f8fc; color: #222; }
+    h1 { color: #0070f3; margin-bottom: 1rem; text-align:center; }
+    form { margin-bottom: 20px; text-align:center; }
+    label { margin: 0 10px 0 0; font-weight: bold; }
+    input[type="date"] { padding: 5px 8px; margin-right: 20px; border-radius: 5px; border: 1.5px solid #ddd; font-size: 1rem; }
+    button { padding: 7px 16px; font-weight: bold; font-size: 1rem; border-radius: 7px; border: none; background: #0070f3; color: white; cursor: pointer; transition: background 0.3s; }
+    button:hover { background: #005bb5; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; box-shadow: 0 0 15px #aaa; background: white; }
+    th, td { border: 1px solid #bbb; padding: 8px 12px; text-align: center; font-size: 0.9rem; }
+    th { background: #eef5ff; font-weight: 700; }
+    tfoot td { font-weight: bold; background: #ddd; }
+    #statusMsg {margin-top: 15px; text-align: center; font-weight: bold;}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<h1>Seller Sales Report</h1>
+<form id="reportForm">
+  <label for="fromDate">From:</label>
+  <input type="date" id="fromDate" required />
+  <label for="toDate">To:</label>
+  <input type="date" id="toDate" required />
+  <button type="submit">Generate Report</button>
+</form>
+<div id="statusMsg"></div>
+<table id="reportTable" style="display:none;">
+  <thead>
+  <tr>
+    <th>Sr. No.</th>
+    <th>Bill No</th>
+    <th>Date</th>
+    <th>Customer Name</th>
+    <th>Product</th>
+    <th>MRP (₹)</th>
+    <th>Price (₹)</th>
+    <th>GST %</th>
+    <th>CGST (₹)</th>
+    <th>SGST (₹)</th>
+    <th>IGST (₹)</th>
+    <th>Line Total (₹)</th>
+  </tr>
+  </thead>
+  <tbody></tbody>
+  <tfoot>
+  <tr>
+    <td colspan="11" style="text-align:right;">Grand Total (₹):</td>
+    <td id="grandTotalCell">0.00</td>
+  </tr>
+  </tfoot>
+</table>
+<script>
+  const supabase = window.supabase.createClient(
+    'https://wamqheltqmufuzrqlxlb.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndhbXFoZWx0cW11ZnV6cnFseGxiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwOTQxMzAsImV4cCI6MjA3NjY3MDEzMH0.xFtK5p22bHNzWcGXUgRUR5f-Q4SGdQperlPf4ItD2sY'
+  );
+
+  const form = document.getElementById('reportForm');
+  const fromDateInput = document.getElementById('fromDate');
+  const toDateInput = document.getElementById('toDate');
+  const statusMsg = document.getElementById('statusMsg');
+  const reportTable = document.getElementById('reportTable');
+  const tbody = reportTable.querySelector('tbody');
+  const grandTotalCell = document.getElementById('grandTotalCell');
+
+  let currentUser = null;
+
+  async function checkUser() {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      alert('Please login to view the report.');
+      window.location.href = 'login.html';
+      return false;
+    }
+    currentUser = user;
+    return true;
+  }
+
+  function formatDate(d) {
+    return new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+  }
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    statusMsg.textContent = '';
+    tbody.innerHTML = '';
+    reportTable.style.display = 'none';
+    grandTotalCell.textContent = '0.00';
+    if (!(await checkUser())) return;
+
+    const fromDate = fromDateInput.value;
+    const toDate = toDateInput.value;
+    if(new Date(fromDate) > new Date(toDate)) {
+      statusMsg.textContent = '"From" date cannot be after "To" date.';
+      return;
+    }
+    statusMsg.textContent = 'Loading report...';
+
+    // 1st: Fetch orders for this seller's `order_items` in range with needed fields
+    let orderItems;
+    try {
+      const { data, error } = await supabase
+        .from('order_items')
+        .select(`
+          id,
+          order_id,
+          quantity,
+          price,
+          hsn_code,
+          gst_rate,
+          cod_payment_status,
+          delivery_status,
+
+          products(name, mrp, gst_rate),
+          orders(created_at, customer_id)
+        `)
+        .eq('seller_id', currentUser.id)
+        .gte('orders.created_at', fromDate+'T00:00:00+05:30')
+        .lte('orders.created_at', toDate+'T23:59:59+05:30');
+      if (error) throw error;
+      orderItems = data;
+      if (!orderItems.length) {
+        statusMsg.textContent = 'No sales found for selected period.';
+        return;
+      }
+    } catch (err) {
+      statusMsg.textContent = 'Error loading report: ' + err.message;
+      return;
+    }
+    // 2nd: Collect all unique customer_id values
+    const customerIdSet = new Set(orderItems.map(x=>x.orders?.customer_id).filter(Boolean));
+    let customerNamesById = {};
+    if (customerIdSet.size > 0) {
+      // Batch query all customers by id
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id,name')
+        .in('id', Array.from(customerIdSet));
+      if (!error && data) {
+        data.forEach(x => { customerNamesById[x.id] = x.name; });
+      }
+    }
+    // 3rd: Sort orderItems by order date
+    orderItems.sort((a, b) =>
+      new Date(a.orders?.created_at || 0) - new Date(b.orders?.created_at || 0)
+    );
+    // 4th: Render Table
+    let srNo = 1, grandTotal = 0;
+    for(const item of orderItems) {
+      const orderDate = item.orders?.created_at;
+      const customerName = customerNamesById[item.orders?.customer_id] || (item.orders?.customer_id ?? 'N/A');
+      const productName = item.products?.name || 'N/A';
+      const mrp = parseFloat(item.products?.mrp) || 0;
+      const price = parseFloat(item.price) || 0;
+      const gstPercent = parseFloat(item.gst_rate ?? item.products?.gst_rate) || 0;
+      // GST split
+      const gstDecimal = gstPercent / 100;
+      const basePrice = price / (1 + gstDecimal);
+      const gstAmountTotal = price - basePrice;
+      // Default: Intra-state split (edit logic if you have seller/customer state for interstate)
+      const cgst = gstAmountTotal / 2;
+      const sgst = gstAmountTotal / 2;
+      const igst = 0;
+      const lineTotal = price * item.quantity;
+      grandTotal += lineTotal;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${srNo++}</td>
+        <td>${item.order_id}</td>
+        <td>${formatDate(orderDate)}</td>
+        <td>${customerName}</td>
+        <td>${productName}</td>
+        <td>${mrp.toFixed(2)}</td>
+        <td>${price.toFixed(2)}</td>
+        <td>${gstPercent.toFixed(2)}</td>
+        <td>${cgst.toFixed(2)}</td>
+        <td>${sgst.toFixed(2)}</td>
+        <td>${igst.toFixed(2)}</td>
+        <td>${lineTotal.toFixed(2)}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+    grandTotalCell.textContent = grandTotal.toFixed(2);
+    reportTable.style.display = 'table';
+    statusMsg.textContent = '';
+  };
+</script>
+</body>
+</html>
